@@ -90,7 +90,7 @@ const wallets = [
 ];
 
 // Simple Connect Wallet Button component
-function ConnectWalletButton() {
+function ConnectWalletButton(): JSX.Element {
     const [account, setAccount] = useState<string | null>(null);
     const [accounts, setAccounts] = useState<string[]>([]);
     const [connecting, setConnecting] = useState(false);
@@ -475,26 +475,30 @@ function ConnectWalletButton() {
                 }
             }
 
-            // Check if the wallet is still connected after our attempts
-            setTimeout(() => {
+            // Only check if wallet is really disconnected in extreme cases
+            // where wallet still shows connected after 1 second
+            let checkDisconnectionTimeout: number | null = null;
+
+            checkDisconnectionTimeout = window.setTimeout(() => {
                 if (window.ethereum) {
                     window.ethereum.request({ method: 'eth_accounts' }).then((accounts: any) => {
-                        console.log("After disconnect, accounts:", accounts);
-                        // If we still have accounts, the wallet didn't disconnect properly
+                        // If we still have accounts after 1 second, only then consider a page reload
                         if (accounts && accounts.length > 0) {
-                            console.log("Wallet didn't fully disconnect. Reloading page...");
-                            window.location.reload();
+                            console.log("Wallet didn't disconnect after 1 second, consider clicking disconnect again");
+                            // Don't auto-reload anymore, let user manually disconnect
+                            // window.location.reload();
                         }
                     }).catch(() => {
-                        // If there's an error checking accounts, reload to be safe
-                        window.location.reload();
+                        // Don't reload on error
+                        console.log("Error checking accounts after disconnect");
                     });
                 }
-            }, 500);
+            }, 1000) as unknown as number;
+
+            // Don't return anything - this would cause React hook rules violation
         } catch (error) {
             console.error("Error clearing wallet connection data:", error);
-            // Even if there's an error, try to reload the page
-            setTimeout(() => window.location.reload(), 500);
+            // Don't force page reloads anymore
         }
     };
 
