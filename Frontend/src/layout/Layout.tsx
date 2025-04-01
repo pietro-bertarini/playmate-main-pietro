@@ -11,66 +11,11 @@ import profileImg from "assets/profile.jpg";
 import Hamburger from "assets/hamburger.svg";
 import { useMenu } from "utils";
 import * as icons from "./icons";
+// Import the chain and wallet provider configurations
+import { chains } from "../types/chains";
+import { walletProviders } from "../types/wallet-providers";
 
-// Chain configurations
-const chains = [
-    {
-        id: "0x1",
-        name: "Ethereum",
-        rpcUrl: "https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
-        currency: "ETH",
-        blockExplorer: "https://etherscan.io"
-    },
-    {
-        id: "0x89",
-        name: "Polygon",
-        rpcUrl: "https://polygon-rpc.com",
-        currency: "MATIC",
-        blockExplorer: "https://polygonscan.com"
-    },
-    {
-        id: "0xa",
-        name: "Optimism",
-        rpcUrl: "https://mainnet.optimism.io",
-        currency: "ETH",
-        blockExplorer: "https://optimistic.etherscan.io"
-    },
-    {
-        id: "0xa4b1",
-        name: "Arbitrum",
-        rpcUrl: "https://arb1.arbitrum.io/rpc",
-        currency: "ETH",
-        blockExplorer: "https://arbiscan.io"
-    }
-];
-
-// Wallet options
-const wallets = [
-    {
-        id: "metamask",
-        name: "MetaMask",
-        icon: "M13.7086 0L8.13807 4.59952L9.30083 2.04766L13.7086 0Z",
-        detectProvider: () => window.ethereum?.isMetaMask
-    },
-    {
-        id: "coinbase",
-        name: "Coinbase Wallet",
-        icon: "M12 0C18.6274 0 24 5.37258 24 12C24 18.6274 18.6274 24 12 24C5.37258 24 0 18.6274 0 12C0 5.37258 5.37258 0 12 0Z",
-        detectProvider: () => window.ethereum?.isCoinbaseWallet
-    },
-    {
-        id: "walletconnect",
-        name: "WalletConnect",
-        icon: "M6.08988 0H17.8851C21.6992 0 24.0001 2.30012 24.0001 6.11482V17.9097C24.0001 21.7248 21.6992 24.0001 17.8851 24.0001H6.08988C2.27572 24.0001 0 21.7248 0 17.9097V6.11482C0 2.30012 2.27572 0 6.08988 0Z",
-        detectProvider: () => false // Need external provider for WalletConnect
-    },
-    {
-        id: "brave",
-        name: "Brave Wallet",
-        icon: "M21.7 5.2L21.33 4.3C19.61 0.82 15.87 0 12 0C8.13 0 4.39 0.82 2.67 4.3L2.3 5.2C1.93 6.07 1.93 7 2.3 7.87L12 24L21.7 7.87C22.07 7 22.07 6.07 21.7 5.2Z",
-        detectProvider: () => window.ethereum?.isBraveWallet
-    }
-];
+// The window.ethereum TypeScript declaration has been moved to src/types/window.d.ts
 
 // Simple Connect Wallet Button component
 function ConnectWalletButton(): JSX.Element {
@@ -127,10 +72,10 @@ function ConnectWalletButton(): JSX.Element {
                         const chainId = await window.ethereum.request({ method: 'eth_chainId' });
                         setCurrentChain(chainId);
 
-                        // Detect current wallet
-                        for (const wallet of wallets) {
-                            if (wallet.detectProvider && wallet.detectProvider()) {
-                                setCurrentWallet(wallet.id);
+                        // Detect current wallet using provider detection functions
+                        for (const provider of walletProviders) {
+                            if (provider.detectInstalled()) {
+                                setCurrentWallet(provider.id);
                                 break;
                             }
                         }
@@ -238,7 +183,7 @@ function ConnectWalletButton(): JSX.Element {
         };
     }, [account]);
 
-    const connectWallet = async (walletId = 'metamask') => {
+    const connectWallet = async (providerId = 'metamask') => {
         // Clear the manual disconnect flag when user tries to connect again
         localStorage.removeItem('walletManuallyDisconnected');
 
@@ -249,71 +194,64 @@ function ConnectWalletButton(): JSX.Element {
             await new Promise(resolve => setTimeout(resolve, 300));
         }
 
-        // Check if we need to open an external wallet website
-        if (!window.ethereum) {
-            if (walletId === 'walletconnect') {
-                // Open WalletConnect in a new tab
-                window.open('https://walletconnect.com/', '_blank');
-                return;
-            }
-
-            // For other wallets, provide installation link
-            const walletUrls: Record<string, string> = {
-                metamask: 'https://metamask.io/download/',
-                coinbase: 'https://www.coinbase.com/wallet/downloads',
-                brave: 'https://brave.com/download/'
-            };
-
-            window.open(walletUrls[walletId] || walletUrls.metamask, '_blank');
+        // Find the selected provider
+        const provider = walletProviders.find(p => p.id === providerId);
+        if (!provider) {
+            console.error(`Provider ${providerId} not found`);
             return;
         }
 
         setConnecting(true);
-        setCurrentWallet(walletId);
+        setCurrentWallet(providerId);
 
         try {
-            // For different wallet providers, we need different approaches
-            if (walletId === 'coinbase' && !window.ethereum.isCoinbaseWallet) {
-                // If selecting Coinbase but not currently using it, open Coinbase website
-                window.open('https://www.coinbase.com/wallet/downloads', '_blank');
+            // Check if provider is installed
+            if (!provider.detectInstalled()) {
+                // Open the install URL in a new tab
+                window.open(provider.installUrl, '_blank');
                 setConnecting(false);
                 return;
             }
 
-            if (walletId === 'brave' && !window.ethereum.isBraveWallet) {
-                // If selecting Brave but not currently using it, open Brave website
-                window.open('https://brave.com/download/', '_blank');
-                setConnecting(false);
-                return;
-            }
+            // Request connection from the provider
+            if (provider.requestConnection) {
+                const walletAccounts = await provider.requestConnection();
+                if (walletAccounts && walletAccounts.length > 0) {
+                    setAccounts(walletAccounts);
+                    setAccount(walletAccounts[0]);
 
-            // Clear any existing permissions to force new provider selection
-            if (walletId === 'metamask') {
-                try {
-                    // This forces MetaMask to show its popup
-                    await window.ethereum.request({
-                        method: 'wallet_requestPermissions',
-                        params: [{ eth_accounts: {} }]
-                    });
-                } catch (error) {
-                    console.error("Error requesting permissions:", error);
+                    // Get the current chain ID
+                    if (window.ethereum) {
+                        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                        setCurrentChain(chainId);
+                    }
+
+                    // Set connection as active since user has explicitly approved
+                    localStorage.setItem('walletConnectionActive', 'true');
                 }
+            } else {
+                // Fallback for providers without specific connection method
+                if (!window.ethereum) {
+                    console.error("No ethereum provider available");
+                    setConnecting(false);
+                    return;
+                }
+
+                const walletAccounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                setAccounts(walletAccounts);
+                setAccount(walletAccounts[0]);
+
+                const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                setCurrentChain(chainId);
+
+                // Set connection as active since user has explicitly approved
+                localStorage.setItem('walletConnectionActive', 'true');
             }
-
-            // Request accounts access
-            const walletAccounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            setAccounts(walletAccounts);
-            setAccount(walletAccounts[0]);
-            const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-            setCurrentChain(chainId);
-
-            // Set connection as active since user has explicitly approved
-            localStorage.setItem('walletConnectionActive', 'true');
 
             // Update current wallet detection
-            for (const wallet of wallets) {
-                if (wallet.detectProvider && wallet.detectProvider()) {
-                    setCurrentWallet(wallet.id);
+            for (const p of walletProviders) {
+                if (p.detectInstalled()) {
+                    setCurrentWallet(p.id);
                     break;
                 }
             }
@@ -509,18 +447,16 @@ function ConnectWalletButton(): JSX.Element {
                     <div className="absolute right-0 mt-2 w-60 rounded-md bg-gray-900 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                         <div className="py-1">
                             <p className="px-4 py-2 text-sm font-medium border-b border-gray-700 text-teal-300">Select Wallet</p>
-                            {wallets.map((wallet) => (
+                            {walletProviders.map((provider) => (
                                 <button
-                                    key={wallet.id}
+                                    key={provider.id}
                                     className="flex w-full items-center text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 group"
-                                    onClick={() => connectWallet(wallet.id)}
+                                    onClick={() => connectWallet(provider.id)}
                                 >
-                                    <div className="w-6 h-6 mr-2 flex items-center justify-center text-teal-400">
-                                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                            <path d={wallet.icon} />
-                                        </svg>
+                                    <div className="w-6 h-6 mr-2 flex items-center justify-center">
+                                        <img src={provider.iconUrl} alt={provider.name} className="w-5 h-5" />
                                     </div>
-                                    <span className="group-hover:text-teal-300">{wallet.name}</span>
+                                    <span className="group-hover:text-teal-300">{provider.name}</span>
                                 </button>
                             ))}
                         </div>
@@ -574,10 +510,13 @@ function ConnectWalletButton(): JSX.Element {
                                 {chains.map((chain) => (
                                     <button
                                         key={chain.id}
-                                        className={`block w-full text-left px-4 py-2 text-sm ${currentChain === chain.id ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
+                                        className={`flex w-full items-center text-left px-4 py-2 text-sm ${currentChain === chain.id ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
                                         onClick={() => switchChain(chain.id)}
                                     >
-                                        <span className="group-hover:text-teal-300">{chain.name}</span>
+                                        <div className="w-5 h-5 mr-2 flex items-center justify-center">
+                                            <img src={chain.iconUrl} alt={chain.name} className="w-4 h-4" />
+                                        </div>
+                                        <span className={currentChain === chain.id ? '' : 'group-hover:text-teal-300'}>{chain.name}</span>
                                     </button>
                                 ))}
                             </>
@@ -601,7 +540,7 @@ function ConnectWalletButton(): JSX.Element {
                                 )}
                                 <button
                                     className="block w-full text-left px-4 py-2 text-sm text-teal-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-teal-300"
-                                    onClick={() => {
+                                    onClick={(e) => {
                                         // Open wallet to add/connect account
                                         window.ethereum?.request({
                                             method: 'wallet_requestPermissions',
@@ -615,7 +554,7 @@ function ConnectWalletButton(): JSX.Element {
                         )}
 
                         <button
-                            className="block w-full text-left px-4 py-2 text-sm text-red-400 border-t border-gray-700 hover:bg-gray-800 group mt-2"
+                            className="block w-full text-left px-4 py-2 text-sm text-red-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-red-300"
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -623,7 +562,7 @@ function ConnectWalletButton(): JSX.Element {
                                 handleDisconnect();
                             }}
                         >
-                            <span className="group-hover:text-red-300">Disconnect</span>
+                            Disconnect
                         </button>
                     </div>
                 </div>
