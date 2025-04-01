@@ -83,7 +83,7 @@ function UserProfile({userData} : any) {
             <UserMenuTarget>
               <img
                 className='ml-4 box-content h-7 w-7 cursor-pointer rounded-full p-2 transition-colors hover:bg-blue-high/10'
-                src={userData.profilePic}
+                src={profileImg}
               />
             </UserMenuTarget>
       </>
