@@ -24,6 +24,7 @@ declare global {
             request: (request: { method: string; params?: any[] }) => Promise<any>;
             on: (eventName: string, callback: any) => void;
             chainId?: string;
+            disconnect?: () => void;
         };
     }
 }
@@ -99,9 +100,37 @@ function ConnectWalletButton() {
     const [menuTab, setMenuTab] = useState<'networks' | 'accounts'>('networks');
     const menuRef = React.useRef<HTMLDivElement>(null);
 
+    // Define disconnectWallet using useCallback to avoid dependency issues
+    const disconnectWallet = React.useCallback(() => {
+        // Reset all state variables to their initial values
+        setAccount(null);
+        setAccounts([]);
+        setCurrentChain(null);
+        setCurrentWallet(null);
+        setMenuOpen(false);
+        setMenuTab('networks');
+
+        // Clear any stored wallet connection data
+        if (typeof window !== 'undefined') {
+            // Some wallets store connection state in localStorage
+            try {
+                // Remove any wallet-specific connection data if exists
+                localStorage.removeItem('walletconnect');
+                localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE');
+            } catch (error) {
+                console.error("Error clearing wallet connection data:", error);
+            }
+        }
+    }, []);
+
     useEffect(() => {
         // Check if wallet is already connected on component mount
         const checkConnection = async () => {
+            // Skip reconnection if manually disconnected
+            if (localStorage.getItem('walletManuallyDisconnected') === 'true') {
+                return;
+            }
+
             if (window.ethereum) {
                 try {
                     const walletAccounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -131,8 +160,8 @@ function ConnectWalletButton() {
 
         checkConnection();
 
-        // Listen for account changes
-        if (window.ethereum) {
+        // Listen for account changes only if not manually disconnected
+        if (window.ethereum && localStorage.getItem('walletManuallyDisconnected') !== 'true') {
             window.ethereum.on('accountsChanged', (walletAccounts: string[]) => {
                 setAccounts(walletAccounts);
                 if (walletAccounts.length > 0) {
@@ -162,7 +191,60 @@ function ConnectWalletButton() {
         };
     }, [currentWallet]);
 
+    useEffect(() => {
+        // This effect will run when account changes to null (disconnect)
+        // Skip automatic reconnection if manually disconnected
+        if (localStorage.getItem('walletManuallyDisconnected') === 'true') {
+            return; // Exit early to prevent automatic reconnection
+        }
+
+        const checkIfStillConnected = async () => {
+            if (window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    if (accounts.length === 0 && account !== null) {
+                        // We were connected but now we're not
+                        setAccount(null);
+                        setAccounts([]);
+                        setCurrentChain(null);
+                        setCurrentWallet(null);
+                        setMenuOpen(false);
+                        setMenuTab('networks');
+
+                        // Clear stored wallet data
+                        try {
+                            localStorage.removeItem('walletconnect');
+                            localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE');
+                        } catch (e) {
+                            console.error("Error clearing storage:", e);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Error checking connection status:", error);
+                }
+            }
+        };
+
+        // Check initially and set up interval to check periodically
+        let interval: number | null = null;
+
+        // Only set up the interval if not manually disconnected
+        if (localStorage.getItem('walletManuallyDisconnected') !== 'true') {
+            checkIfStillConnected();
+            interval = window.setInterval(checkIfStillConnected, 3000) as unknown as number;
+        }
+
+        return () => {
+            if (interval !== null) {
+                clearInterval(interval);
+            }
+        };
+    }, [account]);
+
     const connectWallet = async (walletId = 'metamask') => {
+        // Clear the manual disconnect flag when user tries to connect again
+        localStorage.removeItem('walletManuallyDisconnected');
+
         if (!window.ethereum) {
             if (walletId === 'walletconnect') {
                 // Open WalletConnect in a new tab
@@ -205,14 +287,6 @@ function ConnectWalletButton() {
             setConnecting(false);
             setMenuOpen(false);
         }
-    };
-
-    const disconnectWallet = () => {
-        setAccount(null);
-        setAccounts([]);
-        setCurrentChain(null);
-        setCurrentWallet(null);
-        setMenuOpen(false);
     };
 
     const switchAccount = (newAccount: string) => {
@@ -297,42 +371,113 @@ function ConnectWalletButton() {
         return chain ? chain.name : "Unknown Chain";
     };
 
+    // Reset function that handles disconnection
+    const handleDisconnect = () => {
+        console.log("Disconnecting wallet...");
+
+        // Set flag to prevent auto-reconnection
+        localStorage.setItem('walletManuallyDisconnected', 'true');
+
+        // Force immediate UI reset first
+        setAccount(null);
+        setAccounts([]);
+        setCurrentChain(null);
+        setCurrentWallet(null);
+        setMenuOpen(false);
+        setMenuTab('networks');
+
+        // Clear any stored wallet connection data
+        try {
+            localStorage.removeItem('walletconnect');
+            localStorage.removeItem('WALLETCONNECT_DEEPLINK_CHOICE');
+            localStorage.removeItem('wagmi.store');
+            localStorage.removeItem('wagmi.wallet');
+            localStorage.removeItem('wagmi.connected');
+            localStorage.removeItem('walletConnectionActive');
+
+            // Clear session storage as well
+            sessionStorage.clear();
+
+            // Some wallets expose a disconnect method
+            if (window.ethereum && window.ethereum.disconnect) {
+                try {
+                    window.ethereum.disconnect();
+                } catch (e) {
+                    console.log("No disconnect method available");
+                }
+            }
+
+            // Try to remove event listeners if possible
+            if (window.ethereum) {
+                try {
+                    // @ts-ignore - TypeScript might complain but some wallets support this
+                    window.ethereum.removeAllListeners?.('accountsChanged');
+                    // @ts-ignore
+                    window.ethereum.removeAllListeners?.('chainChanged');
+                } catch (e) {
+                    console.log("Could not remove wallet listeners");
+                }
+            }
+
+            // Check if the wallet is still connected after our attempts
+            setTimeout(() => {
+                if (window.ethereum) {
+                    window.ethereum.request({ method: 'eth_accounts' }).then((accounts: any) => {
+                        console.log("After disconnect, accounts:", accounts);
+                        // If we still have accounts, the wallet didn't disconnect properly
+                        if (accounts && accounts.length > 0) {
+                            console.log("Wallet didn't fully disconnect. Reloading page...");
+                            window.location.reload();
+                        }
+                    }).catch(() => {
+                        // If there's an error checking accounts, reload to be safe
+                        window.location.reload();
+                    });
+                }
+            }, 500);
+        } catch (error) {
+            console.error("Error clearing wallet connection data:", error);
+            // Even if there's an error, try to reload the page
+            setTimeout(() => window.location.reload(), 500);
+        }
+    };
+
     if (!account) {
         return (
             <div className="relative mr-4" ref={menuRef}>
                 <button
                     onClick={() => setMenuOpen(!menuOpen)}
-                    className="flex items-center gap-2 rounded-md bg-blue-high px-3 py-2 text-sm font-medium text-white hover:bg-blue-high/80"
+                    className="flex items-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group"
                 >
-                    Connect Wallet
+                    <span className="group-hover:text-teal-300">Connect Wallet</span>
                     <svg
                         width="12"
                         height="12"
                         viewBox="0 0 12 12"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
-                        className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+                        className={`transition-transform ${menuOpen ? 'rotate-180' : ''} group-hover:text-teal-300`}
                     >
                         <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                 </button>
 
                 {menuOpen && (
-                    <div className="absolute right-0 mt-2 w-60 rounded-md bg-grey-low shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="absolute right-0 mt-2 w-60 rounded-md bg-gray-900 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                         <div className="py-1">
-                            <p className="px-4 py-2 text-sm font-medium border-b border-gray-200 text-gray-700">Select Wallet</p>
+                            <p className="px-4 py-2 text-sm font-medium border-b border-gray-700 text-teal-300">Select Wallet</p>
                             {wallets.map((wallet) => (
                                 <button
                                     key={wallet.id}
-                                    className="flex w-full items-center text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                                    className="flex w-full items-center text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 group"
                                     onClick={() => connectWallet(wallet.id)}
                                 >
-                                    <div className="w-6 h-6 mr-2 flex items-center justify-center text-blue-high">
+                                    <div className="w-6 h-6 mr-2 flex items-center justify-center text-teal-400">
                                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                             <path d={wallet.icon} />
                                         </svg>
                                     </div>
-                                    {wallet.name}
+                                    <span className="group-hover:text-teal-300">{wallet.name}</span>
                                 </button>
                             ))}
                         </div>
@@ -346,50 +491,50 @@ function ConnectWalletButton() {
         <div className="relative mr-4" ref={menuRef}>
             <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center gap-2 rounded-md bg-blue-high px-3 py-2 text-sm font-medium text-white hover:bg-blue-high/80"
+                className="flex items-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group"
             >
-                <span>{shortenAddress(account)}</span>
-                <span className="text-xs opacity-70">{getChainName()}</span>
+                <span className="group-hover:text-teal-300">{shortenAddress(account)}</span>
+                <span className="text-xs text-teal-300">{getChainName()}</span>
                 <svg
                     width="12"
                     height="12"
                     viewBox="0 0 12 12"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
-                    className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+                    className={`transition-transform ${menuOpen ? 'rotate-180' : ''} group-hover:text-teal-300`}
                 >
                     <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
             </button>
 
             {menuOpen && (
-                <div className="absolute right-0 mt-2 w-60 rounded-md bg-grey-low shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                <div className="absolute right-0 mt-2 w-60 rounded-md bg-gray-900 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
                     <div className="py-1">
-                        <div className="flex border-b border-gray-200">
+                        <div className="flex border-b border-gray-700">
                             <button
-                                className={`flex-1 px-4 py-2 text-sm font-medium ${menuTab === 'networks' ? 'text-blue-high' : 'text-gray-700'}`}
+                                className={`flex-1 px-4 py-2 text-sm font-medium group ${menuTab === 'networks' ? 'text-teal-400' : 'text-gray-300 hover:bg-gray-800'}`}
                                 onClick={() => setMenuTab('networks')}
                             >
-                                Networks
+                                <span className="group-hover:text-teal-300">Networks</span>
                             </button>
                             <button
-                                className={`flex-1 px-4 py-2 text-sm font-medium ${menuTab === 'accounts' ? 'text-blue-high' : 'text-gray-700'}`}
+                                className={`flex-1 px-4 py-2 text-sm font-medium group ${menuTab === 'accounts' ? 'text-teal-400' : 'text-gray-300 hover:bg-gray-800'}`}
                                 onClick={() => setMenuTab('accounts')}
                             >
-                                Accounts
+                                <span className="group-hover:text-teal-300">Accounts</span>
                             </button>
                         </div>
 
                         {menuTab === 'networks' && (
                             <>
-                                <p className="px-4 py-2 text-xs text-gray-500">Current: {getChainName()}</p>
+                                <p className="px-4 py-2 text-xs text-gray-400">Current: {getChainName()}</p>
                                 {chains.map((chain) => (
                                     <button
                                         key={chain.id}
-                                        className={`block w-full text-left px-4 py-2 text-sm ${currentChain === chain.id ? 'bg-blue-high/10 text-blue-high font-medium' : 'text-gray-700 hover:bg-gray-200'}`}
+                                        className={`block w-full text-left px-4 py-2 text-sm ${currentChain === chain.id ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
                                         onClick={() => switchChain(chain.id)}
                                     >
-                                        {chain.name}
+                                        <span className="group-hover:text-teal-300">{chain.name}</span>
                                     </button>
                                 ))}
                             </>
@@ -397,22 +542,22 @@ function ConnectWalletButton() {
 
                         {menuTab === 'accounts' && (
                             <>
-                                <p className="px-4 py-2 text-xs text-gray-500">Current: {shortenAddress(account)}</p>
+                                <p className="px-4 py-2 text-xs text-gray-400">Current: {shortenAddress(account)}</p>
                                 {accounts.length > 0 ? (
                                     accounts.map((addr) => (
                                         <button
                                             key={addr}
-                                            className={`block w-full text-left px-4 py-2 text-sm ${account === addr ? 'bg-blue-high/10 text-blue-high font-medium' : 'text-gray-700 hover:bg-gray-200'}`}
+                                            className={`block w-full text-left px-4 py-2 text-sm ${account === addr ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
                                             onClick={() => switchAccount(addr)}
                                         >
-                                            {shortenAddress(addr)}
+                                            <span className="group-hover:text-teal-300">{shortenAddress(addr)}</span>
                                         </button>
                                     ))
                                 ) : (
-                                    <p className="px-4 py-2 text-sm text-gray-500">No additional accounts found</p>
+                                    <p className="px-4 py-2 text-sm text-gray-400">No additional accounts found</p>
                                 )}
                                 <button
-                                    className="block w-full text-left px-4 py-2 text-sm text-blue-high font-medium border-t border-gray-200 hover:bg-gray-200"
+                                    className="block w-full text-left px-4 py-2 text-sm text-teal-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-teal-300"
                                     onClick={() => {
                                         // Open wallet to add/connect account
                                         window.ethereum?.request({
@@ -427,10 +572,15 @@ function ConnectWalletButton() {
                         )}
 
                         <button
-                            className="block w-full text-left px-4 py-2 text-sm text-red-600 border-t border-gray-200 hover:bg-gray-200 mt-2"
-                            onClick={disconnectWallet}
+                            className="block w-full text-left px-4 py-2 text-sm text-red-400 border-t border-gray-700 hover:bg-gray-800 group mt-2"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log("Disconnect button clicked");
+                                handleDisconnect();
+                            }}
                         >
-                            Disconnect
+                            <span className="group-hover:text-red-300">Disconnect</span>
                         </button>
                     </div>
                 </div>
