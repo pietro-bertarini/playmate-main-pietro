@@ -131,7 +131,11 @@ function ConnectWalletButton() {
                 return;
             }
 
-            if (window.ethereum) {
+            // Only check for existing connections if we have previously established a connection
+            // This prevents addresses from showing up before explicit user approval
+            const hasExistingConnection = localStorage.getItem('walletConnectionActive') === 'true';
+
+            if (window.ethereum && hasExistingConnection) {
                 try {
                     const walletAccounts = await window.ethereum.request({ method: 'eth_accounts' });
                     setAccounts(walletAccounts);
@@ -151,9 +155,15 @@ function ConnectWalletButton() {
                         if (!currentWallet && window.ethereum) {
                             setCurrentWallet('metamask');
                         }
+                    } else {
+                        // No accounts found even though we had a previous connection
+                        // Clear the connection flag
+                        localStorage.removeItem('walletConnectionActive');
                     }
                 } catch (error) {
                     console.error("Error checking connection:", error);
+                    // On error, clear the connection flag
+                    localStorage.removeItem('walletConnectionActive');
                 }
             }
         };
@@ -166,9 +176,13 @@ function ConnectWalletButton() {
                 setAccounts(walletAccounts);
                 if (walletAccounts.length > 0) {
                     setAccount(walletAccounts[0]);
+                    // Set connection as active since user has approved accounts
+                    localStorage.setItem('walletConnectionActive', 'true');
                 } else {
                     setAccount(null);
                     setCurrentWallet(null);
+                    // Clear connection flag when all accounts are disconnected
+                    localStorage.removeItem('walletConnectionActive');
                 }
             });
 
@@ -245,6 +259,14 @@ function ConnectWalletButton() {
         // Clear the manual disconnect flag when user tries to connect again
         localStorage.removeItem('walletManuallyDisconnected');
 
+        // Force disconnection of any existing wallet connection first
+        if (account) {
+            await handleDisconnect();
+            // Short delay to ensure disconnection completes
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // Check if we need to open an external wallet website
         if (!window.ethereum) {
             if (walletId === 'walletconnect') {
                 // Open WalletConnect in a new tab
@@ -267,11 +289,43 @@ function ConnectWalletButton() {
         setCurrentWallet(walletId);
 
         try {
+            // For different wallet providers, we need different approaches
+            if (walletId === 'coinbase' && !window.ethereum.isCoinbaseWallet) {
+                // If selecting Coinbase but not currently using it, open Coinbase website
+                window.open('https://www.coinbase.com/wallet/downloads', '_blank');
+                setConnecting(false);
+                return;
+            }
+
+            if (walletId === 'brave' && !window.ethereum.isBraveWallet) {
+                // If selecting Brave but not currently using it, open Brave website
+                window.open('https://brave.com/download/', '_blank');
+                setConnecting(false);
+                return;
+            }
+
+            // Clear any existing permissions to force new provider selection
+            if (walletId === 'metamask') {
+                try {
+                    // This forces MetaMask to show its popup
+                    await window.ethereum.request({
+                        method: 'wallet_requestPermissions',
+                        params: [{ eth_accounts: {} }]
+                    });
+                } catch (error) {
+                    console.error("Error requesting permissions:", error);
+                }
+            }
+
+            // Request accounts access
             const walletAccounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
             setAccounts(walletAccounts);
             setAccount(walletAccounts[0]);
             const chainId = await window.ethereum.request({ method: 'eth_chainId' });
             setCurrentChain(chainId);
+
+            // Set connection as active since user has explicitly approved
+            localStorage.setItem('walletConnectionActive', 'true');
 
             // Update current wallet detection
             for (const wallet of wallets) {
@@ -377,6 +431,8 @@ function ConnectWalletButton() {
 
         // Set flag to prevent auto-reconnection
         localStorage.setItem('walletManuallyDisconnected', 'true');
+        // Clear active connection flag
+        localStorage.removeItem('walletConnectionActive');
 
         // Force immediate UI reset first
         setAccount(null);
