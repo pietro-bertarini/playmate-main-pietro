@@ -607,7 +607,7 @@ function ConnectWalletButton(): JSX.Element {
                                     accounts.map((addr) => (
                                         <button
                                             key={addr}
-                                            className={`block w-full text-left px-4 py-2 text-sm ${account === addr ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
+                                            className={`block w-full text-left px-4 py-2 text-sm ${account === addr ? 'bg-gray-800 text-gray-300 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
                                             onClick={() => switchAccount(addr)}
                                         >
                                             <span className="group-hover:text-teal-300">{shortenAddress(addr)}</span>
