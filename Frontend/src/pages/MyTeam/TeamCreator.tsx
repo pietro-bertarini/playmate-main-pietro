@@ -81,7 +81,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
 
       try {
         const res = await axios.post(
-          "http://127.0.0.1:5000/picUpload",
+          "http://127.0.0.1:5001/picUpload",
           formData
         );
         console.log(res);
@@ -107,7 +107,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
 
       try {
         const res = await axios.post(
-          "http://127.0.0.1:5000/picUpload",
+          "http://127.0.0.1:5001/picUpload",
           formData
         );
         console.log(res);
@@ -128,7 +128,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
     if (!teamGender) setGenderError(true)
     if (!teamName || !teamGender || !selectedSportId || !profilePicPath || !bannerPicPath) return
 
-    fetch("http://127.0.0.1:5000/createTeam", {
+    fetch("http://127.0.0.1:5001/createTeam", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -162,7 +162,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
   }
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
+      fetch("http://127.0.0.1:5001/getUserData", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -181,7 +181,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
         }
 
         setUserData(data.data);
-        
+
         if (data.data == "token expired") {
           window.localStorage.clear();
           window.location.href = "./login";
@@ -189,7 +189,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
       });
 
       // Get the list of sports that exist in the database
-      fetch("http://127.0.0.1:5000/getSports", {
+      fetch("http://127.0.0.1:5001/getSports", {
           method: "GET",
           crossDomain: true,
           headers: {
@@ -206,7 +206,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
       }
       );
 
-      fetch("http://127.0.0.1:5000/getFriends", {
+      fetch("http://127.0.0.1:5001/getFriends", {
           method: "POST",
           crossDomain: true,
           headers: {
@@ -222,7 +222,7 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
       .then((data) => {
         setAllFriends(data.data);
         setShowFriends(data.data)
-        
+
         if (data.data == "token expired") {
           window.localStorage.clear();
           window.location.href = "./login";
@@ -375,13 +375,13 @@ function TeamForm({ onClose, onCreate }: TeamFormProp) {
 
         <div className='mt-6 grid grid-cols-1 gap-x-10 gap-y-4 md:grid-cols-2'>
           {
-            showFriends.map((friend, index) => 
-              <InvitationRow key={index} info={friend} onSelectMember={onSelectMember} checked={members.indexOf(friend._id) > -1} /> 
+            showFriends.map((friend, index) =>
+              <InvitationRow key={index} info={friend} onSelectMember={onSelectMember} checked={members.indexOf(friend._id) > -1} />
             )
           }
         </div>
       </section>
-      
+
       <footer className='mt-20 flex justify-center gap-x-7'>
         <button
           onClick={onClose}

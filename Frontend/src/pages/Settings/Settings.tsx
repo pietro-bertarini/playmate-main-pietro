@@ -25,7 +25,7 @@ function AccountSettings({userData}: any) {
     if (!firstName || !lastName || !userName) return
     console.log(firstName, lastName, userName)
 
-    fetch("http://127.0.0.1:5000/updateProfile", {
+    fetch("http://127.0.0.1:5001/updateProfile", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -67,7 +67,7 @@ function AccountSettings({userData}: any) {
 
     try {
       const res = await axios.post(
-        "http://127.0.0.1:5000/picUpload",
+        "http://127.0.0.1:5001/picUpload",
         formData
       );
       console.log(res);
@@ -251,7 +251,7 @@ export function Settings() {
   const [popupVisible, setPopupVisible] = useState(false);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/getUserData", {
+    fetch("http://127.0.0.1:5001/getUserData", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -266,7 +266,7 @@ export function Settings() {
     .then((res) => res.json())
     .then((data) => {
       setUserData(data.data);
-      
+
       if (data.data == "token expired") {
         if (window.location.pathname !== "/login") {
           window.localStorage.clear();
@@ -291,7 +291,7 @@ export function Settings() {
         setTimeout(() => {
             setPopupVisible(false);
         }
-        , 5000);
+        , 5001);
 
         console.log("popupVisible: ", popupVisible);
     } else {
@@ -300,7 +300,7 @@ export function Settings() {
 }, [popupMessage]);
 
   function updatePassword() {
-    fetch("http://127.0.0.1:5000/changePassword", {
+    fetch("http://127.0.0.1:5001/changePassword", {
       method: "POST",
       crossDomain: true,
       headers: {

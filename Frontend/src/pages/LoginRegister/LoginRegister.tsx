@@ -96,7 +96,7 @@ export function LoginRegister() {
           setTimeout(() => {
               setPopupVisible(false);
           }
-          , 5000);
+          , 5001);
 
           console.log("popupVisible: ", popupVisible);
       } else {
@@ -119,7 +119,7 @@ export function LoginRegister() {
   }, [email, password]);
 
   function login() {
-    fetch("http://127.0.0.1:5000/login-user", {
+    fetch("http://127.0.0.1:5001/login-user", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -147,7 +147,7 @@ export function LoginRegister() {
   }
 
   function register() {
-    fetch("http://127.0.0.1:5000/register", {
+    fetch("http://127.0.0.1:5001/register", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -180,7 +180,7 @@ export function LoginRegister() {
   return (
     <PageView title='Login'>
       <Tab.Group manual defaultIndex={0}>
-        
+
         <Tab.List className='mb-12 flex max-w-full gap-x-2 overflow-x-scroll'>
           <Tab className='app-tab shrink-0 whitespace-nowrap !px-7'>
             Login
@@ -195,9 +195,9 @@ export function LoginRegister() {
             <Login onSubmit={login} onUsernameChange={setEmail} onPasswordChange={setPassword} />
           </Tab.Panel>
           <Tab.Panel>
-            <Register 
-              onSubmit={register} 
-              onUsernameChange={setEmail} 
+            <Register
+              onSubmit={register}
+              onUsernameChange={setEmail}
               onPasswordChange={setPassword}
               onFnameChange={setFname}
               onLnameChange={setLname}

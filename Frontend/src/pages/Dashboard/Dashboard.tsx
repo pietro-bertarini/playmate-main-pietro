@@ -89,7 +89,7 @@ function SideView({events} : any) {
 
 export function Dashboard() {
 
-  const [loaded, setLoaded] = useState(false);    
+  const [loaded, setLoaded] = useState(false);
 
   const [userData, setUserData] = useState("");
   const [events, setEvents] = useState([]);
@@ -98,7 +98,7 @@ export function Dashboard() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
+      fetch("http://127.0.0.1:5001/getUserData", {
           method: "POST",
           crossDomain: true,
           headers: {
@@ -115,9 +115,9 @@ export function Dashboard() {
           if (data.data.userType == "Admin") {
               setAdmin(true);
           }
-  
+
           setUserData(data.data);
-          
+
           if (data.data == "token expired") {
             if (window.location.pathname !== "/login") {
               window.localStorage.clear();
@@ -132,7 +132,7 @@ export function Dashboard() {
   useEffect(() => {
     if(!userData) return;
 
-    fetch("http://127.0.0.1:5000/getEvents", {
+    fetch("http://127.0.0.1:5001/getEvents", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -150,11 +150,11 @@ export function Dashboard() {
         setEvents(data.data);
     });
   }, [userData]);
-  
+
   useEffect(() => {
     if(!events) return;
 
-    fetch("http://127.0.0.1:5000/getFriendRequests", {
+    fetch("http://127.0.0.1:5001/getFriendRequests", {
         method: "POST",
         crossDomain: true,
         headers: {

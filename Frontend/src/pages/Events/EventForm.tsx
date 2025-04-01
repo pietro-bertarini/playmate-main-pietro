@@ -70,7 +70,7 @@ export function EventForm({
     if (!eventInfo.numPlayers) setNumPlayersError(true)
 
     if (!eventInfo.sportId || !eventInfo.teamId || !eventInfo.name || !eventInfo.date || !eventInfo.startTime || !eventInfo.endTime || !eventInfo.location || !eventInfo.cost || !eventInfo.numPlayers) return
-    fetch("http://127.0.0.1:5000/createEvent", {
+    fetch("http://127.0.0.1:5001/createEvent", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -106,7 +106,7 @@ export function EventForm({
           <DialogCrossButton onClick={props.onClose} />
         </Dialog.Title>
         <section className='desk-dialog:w-[43.5rem]'>
-          <Comp 
+          <Comp
             setEventInfo={setEventInfo}
             gameTypeError={gameTypeError}
             teamError={teamError}

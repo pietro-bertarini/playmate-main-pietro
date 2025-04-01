@@ -105,7 +105,7 @@ function NotificationsBox({notifications, setNotifications} : any) {
 }
 
 function NotificationList({notifications, setNotifications} : any) {
-  
+
   function diffBetweenDatesInSecs(date1: any, date2: any) {
     const diffInMs = Math.abs(date2 - date1);
     return diffInMs / 1000;
@@ -141,7 +141,7 @@ function NotificationList({notifications, setNotifications} : any) {
 
   function handleAcceptFriendRequest(id) {
 
-      fetch("http://127.0.0.1:5000/acceptFriendRequest", {
+      fetch("http://127.0.0.1:5001/acceptFriendRequest", {
               method: "POST",
               crossDomain: true,
               headers: {
@@ -172,7 +172,7 @@ function NotificationList({notifications, setNotifications} : any) {
   }
 
   function handleRejectFriendRequest(id) {
-      fetch("http://127.0.0.1:5000/rejectFriendRequest", {
+      fetch("http://127.0.0.1:5001/rejectFriendRequest", {
               method: "POST",
               crossDomain: true,
               headers: {
@@ -202,7 +202,7 @@ function NotificationList({notifications, setNotifications} : any) {
   }
 
   function handleAcceptEventInvite(id) {
-      fetch("http://127.0.0.1:5000/acceptEventInvite", {
+      fetch("http://127.0.0.1:5001/acceptEventInvite", {
               method: "POST",
               crossDomain: true,
               headers: {
@@ -232,7 +232,7 @@ function NotificationList({notifications, setNotifications} : any) {
   }
 
   function handleRejectEventInvite(id) {
-      fetch("http://127.0.0.1:5000/rejectEventInvite", {
+      fetch("http://127.0.0.1:5001/rejectEventInvite", {
               method: "POST",
               crossDomain: true,
               headers: {
@@ -327,7 +327,7 @@ function NotificationList({notifications, setNotifications} : any) {
             <h5 className="font-xsss text-grey-900 mb-1 mt-0 fw-700 d-block">No notifications</h5>
         </div>
     )}
-      
+
       {/*<Notification
         title='Event team match ended'
         profileSrc={Profile2}

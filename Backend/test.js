@@ -4,12 +4,12 @@ app.get('/users',async(req,res)=>{
     const allUser = await User.find({});
     const page= parseInt(req.query.page)
     const limit= parseInt(req.query.limit)
-    
-  
+
+
     const startIndex=(page-1)*limit
     const endIndex= page* limit
-  
-  
+
+
     const results={}
     results.totalUser=allUser.length;
     results.pageCount = Math.ceil(allUser.length / limit);
@@ -18,7 +18,7 @@ app.get('/users',async(req,res)=>{
         page:page+1,
         limit:limit
       }
-  
+
     }
     if(startIndex>0){
       results.prev={
@@ -29,5 +29,5 @@ app.get('/users',async(req,res)=>{
     results.resultUsers=allUser.slice(startIndex,endIndex)
     res.json(results)
   })
-  
-//   GET http://127.0.0.1:5000/users?page=1&limit=4  
+
+//   GET http://127.0.0.1:5001/users?page=1&limit=4

@@ -20,7 +20,7 @@ import { set } from "date-fns";
 
 function ProfileBox({userData, own, friendStatus} : any) {
   const sendFriendRequest = (friendId: string) => {
-    fetch("http://127.0.0.1:5000/sendFriendRequest", {
+    fetch("http://127.0.0.1:5001/sendFriendRequest", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -35,7 +35,7 @@ function ProfileBox({userData, own, friendStatus} : any) {
     })
     .then((res) => res.json())
     .then((data) => {
-        
+
     });
   }
 
@@ -107,7 +107,7 @@ function Filters(props: any) {
   }
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/getTeams", {
+    fetch("http://127.0.0.1:5001/getTeams", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -124,7 +124,7 @@ function Filters(props: any) {
       setTeams(data.data);
     });
 
-    fetch("http://127.0.0.1:5000/getSports", {
+    fetch("http://127.0.0.1:5001/getSports", {
       method: "GET",
       crossDomain: true,
       headers: {
@@ -187,7 +187,7 @@ function Filters(props: any) {
             src={IconDate}
           />
           {
-            showCalendar && 
+            showCalendar &&
               <div className="absolute calendar">
                 <CalenderComponent setSelectedDate={setSelectedDate} outSideClickFunc={() => setShowCalendar(false)} />
               </div>
@@ -317,8 +317,8 @@ function Table({events} : any) {
 }
 
 export function MyPlaymate() {
-  const [loaded, setLoaded] = useState(false);   
-  const [own, setOwn] = useState(""); 
+  const [loaded, setLoaded] = useState(false);
+  const [own, setOwn] = useState("");
   const [friendStatus, setFriendStatus] = useState(false)
 
   const [userData, setUserData] = useState("");
@@ -334,11 +334,11 @@ export function MyPlaymate() {
 
   useEffect(() => {
     const id = window.location.href.split("id=")[1]
-    let url = "http://127.0.0.1:5000/getUserData"
+    let url = "http://127.0.0.1:5001/getUserData"
     if (id) {
       url += `/${id}`
 
-      fetch("http://127.0.0.1:5000/getFriendStatus", {
+      fetch("http://127.0.0.1:5001/getFriendStatus", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -355,7 +355,7 @@ export function MyPlaymate() {
       .then((data) => {
         if (data.data === "Accepted") setFriendStatus(true)
       });
-    } 
+    }
 
     fetch(url, {
       method: "POST",
@@ -390,7 +390,7 @@ export function MyPlaymate() {
   useEffect(() => {
     if(!userData) return;
     console.log("here", userData)
-    fetch("http://127.0.0.1:5000/getEvents", {
+    fetch("http://127.0.0.1:5001/getEvents", {
       method: "POST",
       crossDomain: true,
       headers: {
@@ -427,13 +427,13 @@ export function MyPlaymate() {
   return (
     <PageView title='My Playmate'>
       <ProfileBox userData={userData} own={own} friendStatus={friendStatus} />
-      <Filters 
+      <Filters
         selectedTeam={selectedTeam}
-        setSelectedTeam={setSelectedTeam} 
+        setSelectedTeam={setSelectedTeam}
         selectedSport={selectedSport}
-        setSelectedSport={setSelectedSport} 
+        setSelectedSport={setSelectedSport}
         selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate} 
+        setSelectedDate={setSelectedDate}
         searchKey={searchKey}
         setSearchKey={setSearchKey} />
       <Table events={showedEvents} />

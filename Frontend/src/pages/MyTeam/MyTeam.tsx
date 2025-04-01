@@ -98,8 +98,8 @@ function ExploreTeamGrid({teams}: any) {
 export function MyTeam() {
   const [searchOpen, setSearchOpen] = useState(false);
 
-  
-  const [loaded, setLoaded] = useState(false);    
+
+  const [loaded, setLoaded] = useState(false);
 
   const [userData, setUserData] = useState("");
   const [teams, setTeams] = useState([]);
@@ -112,7 +112,7 @@ export function MyTeam() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
+      fetch("http://127.0.0.1:5001/getUserData", {
           method: "POST",
           crossDomain: true,
           headers: {
@@ -129,7 +129,7 @@ export function MyTeam() {
           if (data.data.userType == "Admin") {
               setAdmin(true);
           }
-  
+
           setUserData(data.data);
 
           if (data.data == "token expired") {
@@ -146,7 +146,7 @@ export function MyTeam() {
   useEffect(() => {
     if(!userData) return;
 
-    fetch("http://127.0.0.1:5000/getTeams", {
+    fetch("http://127.0.0.1:5001/getTeams", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -166,7 +166,7 @@ export function MyTeam() {
     }
     );
 
-    fetch("http://127.0.0.1:5000/getAllTeams", {
+    fetch("http://127.0.0.1:5001/getAllTeams", {
         method: "POST",
         crossDomain: true,
         headers: {

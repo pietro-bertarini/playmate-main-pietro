@@ -56,7 +56,7 @@ function EventFilters(props: any) {
   }
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/getSports", {
+    fetch("http://127.0.0.1:5001/getSports", {
       method: "GET",
       crossDomain: true,
       headers: {
@@ -110,7 +110,7 @@ function EventFilters(props: any) {
           src={IconDate}
         />
         {
-            showCalendar && 
+            showCalendar &&
               <div className="absolute calendar z-10">
                 <CalenderComponent setSelectedDate={setSelectedDate} outSideClickFunc={() => setShowCalendar(false)} />
               </div>
@@ -169,7 +169,7 @@ export function Events() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filtersOpen, setfiltersOpen] = useState(false);
 
-  const [loaded, setLoaded] = useState(false);    
+  const [loaded, setLoaded] = useState(false);
 
   const [userData, setUserData] = useState("");
   const [myEvents, setMyEvents] = useState([]);
@@ -184,7 +184,7 @@ export function Events() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
+      fetch("http://127.0.0.1:5001/getUserData", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -217,7 +217,7 @@ export function Events() {
   useEffect(() => {
     if(!userData) return;
 
-    fetch("http://127.0.0.1:5000/getEvents", {
+    fetch("http://127.0.0.1:5001/getEvents", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -236,7 +236,7 @@ export function Events() {
         setLoaded(true);
     });
 
-    fetch("http://127.0.0.1:5000/getEvents", {
+    fetch("http://127.0.0.1:5001/getEvents", {
         method: "POST",
         crossDomain: true,
         headers: {

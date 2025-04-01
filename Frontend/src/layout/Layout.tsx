@@ -93,7 +93,7 @@ function UserProfile({userData} : any) {
 export function Layout() {
   let [open, setOpen] = React.useState(false);
 
-  const [loaded, setLoaded] = useState(false);    
+  const [loaded, setLoaded] = useState(false);
 
   const [userData, setUserData] = useState("");
   const [events, setEvents] = useState([]);
@@ -102,7 +102,7 @@ export function Layout() {
   const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
+      fetch("http://127.0.0.1:5001/getUserData", {
           method: "POST",
           crossDomain: true,
           headers: {
@@ -119,9 +119,9 @@ export function Layout() {
           if (data.data.userType == "Admin") {
               setAdmin(true);
           }
-  
+
           setUserData(data.data);
-          
+
           if (data.data == "token expired") {
             if (window.location.pathname !== "/login") {
               window.localStorage.clear();
@@ -136,7 +136,7 @@ export function Layout() {
   useEffect(() => {
     if(!userData) return;
 
-    fetch("http://127.0.0.1:5000/getEvents", {
+    fetch("http://127.0.0.1:5001/getEvents", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -157,11 +157,11 @@ export function Layout() {
         setEvents(data.data);
     });
   }, [userData]);
-  
+
   useEffect(() => {
     if(!events) return;
 
-    fetch("http://127.0.0.1:5000/getFriendRequests", {
+    fetch("http://127.0.0.1:5001/getFriendRequests", {
         method: "POST",
         crossDomain: true,
         headers: {
@@ -187,7 +187,7 @@ export function Layout() {
   return (
     <>
       {!loaded && (
-          <BarLoader color="#5ce5e2" 
+          <BarLoader color="#5ce5e2"
           cssOverride={{
             display: "block",
             margin: "10vh auto",
@@ -217,12 +217,12 @@ function ContentPane({ setOpen, userData, events, friendRequests }: any) {
     events.forEach((event: any) => {
       event.type = "eventInvite";
     });
-  
+
     // Set type in friend requests array to "friendRequest"
     friendRequests.forEach((friendRequest: any) => {
       friendRequest.type = "friendRequest";
     });
-  
+
     // Combine events and friend requests into notifications array
     let notificationsTemp = events.concat(friendRequests);
     setNotifications(notificationsTemp)

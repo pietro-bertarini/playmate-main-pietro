@@ -64,7 +64,7 @@ app.post("/register", async (req, res) => {                               // don
       return res.json({ error: "User already Exists" });
     }
 
-    const profilePics = ['http://127.0.0.1:5000/footballer1.jpg', 'http://127.0.0.1:5000/footballer2.jpg', 'http://127.0.0.1:5000/footballer3.jpg', 'http://127.0.0.1:5000/footballer4.jpg']
+    const profilePics = ['http://127.0.0.1:5001/footballer1.jpg', 'http://127.0.0.1:5001/footballer2.jpg', 'http://127.0.0.1:5001/footballer3.jpg', 'http://127.0.0.1:5001/footballer4.jpg']
     const randomProfilePic = profilePics[Math.floor(Math.random() * profilePics.length)];
 
     await User.create({
@@ -179,7 +179,7 @@ app.post("/changePassword", async (req, res) => {                     // done
   User.findOne({ email: userEmail })
     .then(async (data) => {
       const userId = data._id;
-      
+
       if (await bcrypt.compare(oldPassword, data.password)) {
         const encryptedPassword = await bcrypt.hash(newPassword, 10);
         User.updateOne(
@@ -236,7 +236,7 @@ app.post("/joinTeam/:teamId/:inviteCode", async (req, res) => {
     User.findOne({ email: userEmail })
       .then((data) => {
         const userId = data._id;
-        
+
         // Check if the user is already a member of the team
         TeamMembers.findOne({ user: userId, team: teamId })
           .then((data) => {
@@ -283,7 +283,7 @@ app.post("/sendFriendRequest", async (req, res) => {              // done
       return res.send({ status: "error", data: "token expired" });
     }
     const userEmail = user.email;
-    
+
     // Get the user id from the user email
     User.findOne({ email: userEmail })
       .then((data) => {
@@ -365,7 +365,7 @@ app.post("/acceptFriendRequest", async (req, res) => {                // done
               res.send({ status: "error", data: "You need to send a Friend Request first!" });
             }
           })
-          .catch((error) => { 
+          .catch((error) => {
             console.log(error);
           });
       })
@@ -417,7 +417,7 @@ app.post("/rejectFriendRequest", async (req, res) => {              // done
               res.send({ status: "error", data: "You need to send a Friend Request first!" });
             }
           })
-          .catch((error) => { 
+          .catch((error) => {
             console.log(error);
           });
       })
@@ -514,12 +514,12 @@ app.post("/removeFriend", async (req, res) => {
       return res.send({ status: "error", data: "token expired" });
     }
     const userEmail = user.email;
-    
+
     // Get the user id from the user email
     User.findOne({ email: userEmail })
       .then((data) => {
         const userId = data._id;
-        
+
         // Get the friend request from the friend
         UserFriends.findOne({ user: friendId, friend: userId })
           .then((data) => {
@@ -631,7 +631,7 @@ app.post("/getFriends", async (req, res) => {                         // done
     res.send({ status: "error", data: error });
   }
 });
-              
+
 app.post("/getFriendRequests", async (req, res) => {                  // done
   const { token } = req.body;
 
@@ -647,7 +647,7 @@ app.post("/getFriendRequests", async (req, res) => {                  // done
       return res.send({ status: "error", data: "token expired" });
     }
     const userEmail = user.email;
-    
+
     // Get the user id from the user email
     User.findOne({ email: userEmail })
       .then((data) => {
@@ -658,7 +658,7 @@ app.post("/getFriendRequests", async (req, res) => {                  // done
           .then((data) => {
             let friendRequests = [];
             let friendRequestsUserIds = [];
-            
+
             data.forEach((friendRequest) => {
               friendRequestsUserIds.push(friendRequest.user);
               friendRequests.push(friendRequest);
@@ -770,7 +770,7 @@ app.post("/getUserData/:id", async (req, res) => {
       .catch((error) => {
         res.send({ status: "error", data: error });
       });
-  } catch (error) { 
+  } catch (error) {
     console.log(error)
   }
 });
@@ -793,11 +793,11 @@ app.post("/getTeamData/:id", async (req, res) => {
     const useremail = user.email;
     User.findOne({ email: useremail })
       .then((user) => {
-        
+
         // Get the member count of the team
         TeamMembers.countDocuments({ "team": teamId })
         .then((memberCount) => {
-          
+
           Team.findOne({ "_id": teamId })
           .then((teamDataTemp) => {
             let teamData = {
@@ -828,7 +828,7 @@ app.post("/getTeamData/:id", async (req, res) => {
           .catch((error) => {
             res.send({ status: "error", data: error });
           });
-          
+
         })
         .catch((error) => {
           res.send({ status: "error", data: error });
@@ -843,7 +843,7 @@ app.post("/getTeamData/:id", async (req, res) => {
     res.send({ status: "error", data: error });
 });
 
-  } catch (error) { 
+  } catch (error) {
     console.log(error)
   }
 });
@@ -856,7 +856,7 @@ app.post("/picUpload", async (req, res) => {
   // Give the file a unique name
   const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
   const filename = uniqueSuffix + "-" + file.name;
-  
+
   try {
     const user = jwt.verify(token, JWT_SECRET, (err, res) => {
       if (err) {
@@ -871,11 +871,11 @@ app.post("/picUpload", async (req, res) => {
         if (err) {
           res.status(500).send({ message: "File upload failed", code: 200 });
         } else {
-          res.status(200).send({ message: "File Uploaded", data: "http://127.0.0.1:5000/profiles/"+filename, code: 200 });
+          res.status(200).send({ message: "File Uploaded", data: "http://127.0.0.1:5001/profiles/"+filename, code: 200 });
         }
       });
     }
-  
+
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1045,7 +1045,7 @@ app.post("/updateTeam", async (req, res) => {
 
 app.post("/getTeams", async (req, res) => {
   const { token } = req.body;
-  
+
   // Get all teams the user is a member of
   const user = jwt.verify(token, JWT_SECRET, (err, res) => {
     if (err) {
@@ -1061,7 +1061,7 @@ app.post("/getTeams", async (req, res) => {
   try {
     // Get the user id from the user email
     User.findOne({ email: userEmail })
-      .then((data) => { 
+      .then((data) => {
         const userId = data._id;
         TeamMembers.find({ user: userId })
           .then((data) => {
@@ -1115,7 +1115,7 @@ app.post("/getTeams", async (req, res) => {
 });
 app.post("/getAllTeams", async (req, res) => {
   const { token } = req.body;
-  
+
   // Get all teams the user is a member of
   const user = jwt.verify(token, JWT_SECRET, (err, res) => {
     if (err) {
@@ -1178,7 +1178,7 @@ app.post("/getTeamMembers", async (req, res) => {
     if (user == "token expired") {
       return res.send({ status: "error", data: "token expired" });
     }
-    
+
     TeamMembers.find({ team: teamId })
       .then((teamMembersData) => {
         let teamMembers = [];
@@ -1375,7 +1375,7 @@ app.post("/getEvents", async (req, res) => {
                     repeat: event.repeat,
                     cost: event.cost
                   }
-  
+
                   eventsData.push(eventData);
                 }
 
@@ -1423,7 +1423,7 @@ app.post("/acceptEventInvite", async (req, res) => {
             res.send({ status: "error", data: error });
           });
       })
-      
+
   } catch (error) {
     console.log(error);
     res.send({ status: "error", data: error });
@@ -1464,7 +1464,7 @@ app.post("/rejectEventInvite", async (req, res) => {
   }
 });
 
-app.listen(5000, () => {
+app.listen(5001, () => {
   console.log("Server Started");
 });
 
@@ -1483,7 +1483,7 @@ app.get("/forgot-password", async (req, res) => {
       expiresIn: "5m",
     });
     console.log(token);
-    const link = `http://127.0.0.1:5000/reset-password/${oldUser._id}/${token}`;
+    const link = `http://127.0.0.1:5001/reset-password/${oldUser._id}/${token}`;
     let transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 465,
@@ -1498,7 +1498,7 @@ app.get("/forgot-password", async (req, res) => {
         expires: 1484314697598,
       },
     });
-    
+
 
     var mailOptions = {
       from: "SportsPlatform@gmail.com",
@@ -1627,7 +1627,7 @@ app.get("/paginatedUsers", async (req, res) => {
 
 app.post("/addSportsType", async (req, res) => {
   const { name, description, profilePic, adminKey } = req.body;
-  
+
 
   if(adminKey == JWT_SECRET){
     try {

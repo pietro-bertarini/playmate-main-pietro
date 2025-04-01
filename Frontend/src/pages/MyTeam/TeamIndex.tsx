@@ -329,7 +329,7 @@ export function TeamIndex() {
       setSelectedTeamId(teamId);
 
       // Wait for the teamsData to be loaded
-      if(loaded) {   
+      if(loaded) {
           setOption(document.getElementById("teamDropdown"), teamId);
       }
   }
@@ -358,14 +358,14 @@ export function TeamIndex() {
               setSelectedTeamById(teamId);
               updateTeamData();
           }
-          
+
       } catch (error) {
-          
+
       }
   }
 
   useEffect(() => {
-      fetch("http://127.0.0.1:5000/getUserData", {
+      fetch("http://127.0.0.1:5001/getUserData", {
               method: "POST",
               crossDomain: true,
               headers: {
@@ -382,9 +382,9 @@ export function TeamIndex() {
           if (data.data.userType == "Admin") {
               setAdmin(true);
           }
-  
+
           setUserData(data.data);
-          
+
           if (data.data == "token expired") {
               window.localStorage.clear();
               window.location.href = "../../../login";
@@ -393,7 +393,7 @@ export function TeamIndex() {
       });
 
       // Get the list of sports that exist in the database
-      fetch("http://127.0.0.1:5000/getSports", {
+      fetch("http://127.0.0.1:5001/getSports", {
           method: "GET",
           crossDomain: true,
           headers: {
@@ -428,7 +428,7 @@ export function TeamIndex() {
           setTimeout(() => {
               setPopupVisible(false);
           }
-          , 5000);
+          , 5001);
 
           console.log("popupVisible: ", popupVisible);
       } else {
@@ -454,7 +454,7 @@ export function TeamIndex() {
 
   function updateTeamData() {
       if(selectedTeamId != "") {
-          fetch("http://127.0.0.1:5000/getTeamData/"+selectedTeamId, {
+          fetch("http://127.0.0.1:5001/getTeamData/"+selectedTeamId, {
               method: "POST",
               crossDomain: true,
               headers: {
@@ -479,7 +479,7 @@ export function TeamIndex() {
               baseUrl = baseUrl.replace("/Teams", "");
 
               setTeamInviteLink(baseUrl + "/JoinTeam/" + data.data.id + "/" + data.data.inviteCode);
-              
+
               setLoaded(true);
 
               // Wait at least 500ms before setting the loadedTeamData to true
@@ -493,7 +493,7 @@ export function TeamIndex() {
   useEffect(() => {
       // Get the list of members of the team
       if(selectedTeamId != "") {
-          fetch("http://127.0.0.1:5000/getTeamMembers/", {
+          fetch("http://127.0.0.1:5001/getTeamMembers/", {
               method: "POST",
               crossDomain: true,
               headers: {
