@@ -12,23 +12,6 @@ import Hamburger from "assets/hamburger.svg";
 import { useMenu } from "utils";
 import * as icons from "./icons";
 
-// Add TypeScript declaration for window.ethereum
-// todo: Move this later
-// This is needed to avoid TypeScript errors when using window.ethereum
-declare global {
-    interface Window {
-        ethereum?: {
-            isMetaMask?: boolean;
-            isCoinbaseWallet?: boolean;
-            isBraveWallet?: boolean;
-            request: (request: { method: string; params?: any[] }) => Promise<any>;
-            on: (eventName: string, callback: any) => void;
-            chainId?: string;
-            disconnect?: () => void;
-        };
-    }
-}
-
 // Chain configurations
 const chains = [
     {
