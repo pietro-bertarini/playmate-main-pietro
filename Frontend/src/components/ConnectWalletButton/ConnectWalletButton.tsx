@@ -66,7 +66,9 @@ export function ConnectWalletButton(): JSX.Element {
       });
 
       wcProvider.on('chainChanged', (chainId: number) => {
-        setCurrentChain(`0x${chainId.toString(16)}`);
+        console.log('Chain changed to:', chainId);
+        const hexChainId = `0x${chainId.toString(16)}`;
+        setCurrentChain(hexChainId);
       });
 
       wcProvider.on('disconnect', () => {
@@ -203,48 +205,71 @@ export function ConnectWalletButton(): JSX.Element {
   };
 
   const switchChain = async (chainId: string) => {
-    if (walletProvider === 'walletconnect') {
-      // For WalletConnect, we currently don't support chain switching in this UI
-      // The user would need to do that in their wallet app
-      alert("Please switch networks in your WalletConnect compatible wallet app");
-      setMenuOpen(false);
-      return;
-    }
-
-    if (!window.ethereum) return;
-
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId }],
-      });
-    } catch (switchError: any) {
-      // This error code indicates that the chain has not been added to MetaMask.
-      if (switchError.code === 4902) {
-        const chain = chains.find(c => c.id === chainId);
-        if (!chain) return;
+      if (walletProvider === 'walletconnect') {
+        const provider = getWalletConnectProvider();
+        if (!provider) {
+          throw new Error("WalletConnect provider not initialized");
+        }
 
-        try {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [
-              {
-                chainId: chain.id,
-                chainName: chain.name,
-                rpcUrls: [chain.rpcUrl],
-                nativeCurrency: {
-                  name: chain.currency,
-                  symbol: chain.currency,
-                  decimals: 18,
+        // Convert chainId to number if it's in hex format
+        const targetChainId = typeof chainId === 'string' && chainId.startsWith('0x') 
+          ? parseInt(chainId, 16) 
+          : Number(chainId);
+
+        console.log("Switching chain context to:", targetChainId);
+        
+        // Switch the chain context in the provider
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainId }],
+        });
+
+        // Update the UI immediately
+        setCurrentChain(chainId);
+        setMenuOpen(false);
+        return;
+      }
+
+      // Handle MetaMask chain switching
+      if (!window.ethereum) return;
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId }],
+        });
+        setCurrentChain(chainId);
+      } catch (switchError: any) {
+        if (switchError.code === 4902) {
+          const chain = chains.find(c => c.id === chainId);
+          if (!chain) return;
+
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: chain.id,
+                  chainName: chain.name,
+                  rpcUrls: [chain.rpcUrl],
+                  nativeCurrency: {
+                    name: chain.currency,
+                    symbol: chain.currency,
+                    decimals: 18,
+                  },
+                  blockExplorerUrls: [chain.blockExplorer],
                 },
-                blockExplorerUrls: [chain.blockExplorer],
-              },
-            ],
-          });
-        } catch (addError) {
-          console.error("Error adding chain:", addError);
+              ],
+            });
+            setCurrentChain(chainId);
+          } catch (addError) {
+            console.error("Error adding chain:", addError);
+          }
         }
       }
+    } catch (error) {
+      console.error("Error switching chain:", error);
     } finally {
       setMenuOpen(false);
     }
@@ -294,9 +319,15 @@ export function ConnectWalletButton(): JSX.Element {
   };
 
   const getChainName = () => {
-    if (!currentChain) return "";
-    const chain = chains.find(c => c.id === currentChain);
+    if (!currentChain) return "Unknown Chain";
+    const chain = chains.find(c => c.id.toLowerCase() === currentChain.toLowerCase());
     return chain ? chain.name : "Unknown Chain";
+  };
+
+  const getChainIcon = (): string | undefined => {
+    if (!currentChain) return undefined;
+    const chain = chains.find(c => c.id.toLowerCase() === currentChain.toLowerCase());
+    return chain ? chain.iconUrl : undefined;
   };
 
   /**
@@ -385,7 +416,16 @@ export function ConnectWalletButton(): JSX.Element {
         className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group cursor-pointer"
       >
         {shortenAddress(account)}
-        <span className="text-xs text-teal-300">{getChainName()}</span>
+        <div className="flex items-center gap-1">
+          {getChainIcon() && (
+            <img 
+              src={getChainIcon()} 
+              alt={getChainName()} 
+              className="w-4 h-4 rounded-full"
+            />
+          )}
+          <span className="text-xs text-teal-300">{getChainName()}</span>
+        </div>
         <svg
           width="12"
           height="12"
