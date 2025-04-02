@@ -2,10 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { chains } from "../../types/chains";
 import { walletProviders } from "../../types/wallet-providers";
 import { disconnectWalletConnect, getWalletConnectProvider, resetProvider, openWalletConnectModal, initiateWalletConnectFlow } from '../../utils/walletConnectSetup';
-import { Web3Provider } from '@ethersproject/providers';
-import Web3 from 'web3';
-import { useModal } from '@/contexts/ModalContext';
-import { formatEllipsisTxt } from '@/helpers/formatters';
 
 /**
  * A standalone wallet connection component that handles connecting to
@@ -14,7 +10,6 @@ import { formatEllipsisTxt } from '@/helpers/formatters';
 export function ConnectWalletButton(): JSX.Element {
   const [account, setAccount] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
-  const [connecting, setConnecting] = useState(false);
   const [currentChain, setCurrentChain] = useState<string | null>(null);
   const [walletProvider, setWalletProvider] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -104,7 +99,7 @@ export function ConnectWalletButton(): JSX.Element {
   const connectWallet = async (providerId = 'metamask') => {
     // Clear the manual disconnect flag when user tries to connect again
     localStorage.removeItem('walletManuallyDisconnected');
-    
+
     // Force disconnection of any existing wallet connection first
     if (account) {
       await handleDisconnect();
@@ -118,10 +113,9 @@ export function ConnectWalletButton(): JSX.Element {
       console.error(`Provider ${providerId} not found`);
       return;
     }
-    
-    setConnecting(true);
+
     setWalletProvider(providerId);
-    
+
     try {
       // Special case for WalletConnect - try direct open first
       if (providerId === 'walletconnect') {
@@ -129,17 +123,17 @@ export function ConnectWalletButton(): JSX.Element {
           console.log("Connecting to WalletConnect...");
           const walletAccounts = await initiateWalletConnectFlow();
           console.log("WalletConnect connection successful, accounts:", walletAccounts);
-          
+
           if (walletAccounts && walletAccounts.length > 0) {
             setAccounts(walletAccounts);
             setAccount(walletAccounts[0]);
-            
+
             // Get chain ID from WalletConnect provider
             const wcProvider = getWalletConnectProvider();
             if (wcProvider && wcProvider.chainId) {
               setCurrentChain(`0x${wcProvider.chainId.toString(16)}`);
             }
-            
+
             setWalletProvider('walletconnect');
             localStorage.setItem('walletConnectionActive', 'true');
             return; // Exit early on success
@@ -149,39 +143,29 @@ export function ConnectWalletButton(): JSX.Element {
           }
         } catch (wcError: any) {
           console.error("WalletConnect connection error:", wcError);
-          
-          // If code is 4001, it's a user rejection
-          if (wcError.code === 4001) {
-            console.log("User rejected the WalletConnect connection");
-            setWalletProvider(null);
-            throw wcError; // Re-throw to be caught by the outer handler
-          }
-          
-          // If we get here, there was some other error with WalletConnect
           setWalletProvider(null);
           throw wcError;
         }
       }
-      
+
       // Check if provider is installed (skip this for WalletConnect)
       if (providerId !== 'walletconnect' && !provider.detectInstalled()) {
         // Open the install URL in a new tab
         window.open(provider.installUrl, '_blank');
-        setConnecting(false);
         return;
       }
-      
+
       // Request connection from the provider
       if (provider.requestConnection) {
         try {
           console.log(`Requesting connection from ${providerId}...`);
           const walletAccounts = await provider.requestConnection();
           console.log(`Got accounts from ${providerId}:`, walletAccounts);
-          
+
           if (walletAccounts && walletAccounts.length > 0) {
             setAccounts(walletAccounts);
             setAccount(walletAccounts[0]);
-            
+
             // Get the current chain ID
             if (providerId === 'walletconnect') {
               const wcProvider = getWalletConnectProvider();
@@ -189,7 +173,7 @@ export function ConnectWalletButton(): JSX.Element {
                 setCurrentChain(`0x${wcProvider.chainId.toString(16)}`);
               }
             }
-            
+
             // Set connection as active since user has explicitly approved
             localStorage.setItem('walletConnectionActive', 'true');
           } else {
@@ -214,7 +198,6 @@ export function ConnectWalletButton(): JSX.Element {
       console.error("Error connecting wallet:", error);
       setWalletProvider(null);
     } finally {
-      setConnecting(false);
       setMenuOpen(false);
     }
   };
@@ -227,7 +210,7 @@ export function ConnectWalletButton(): JSX.Element {
       setMenuOpen(false);
       return;
     }
-    
+
     if (!window.ethereum) return;
 
     try {
@@ -326,7 +309,7 @@ export function ConnectWalletButton(): JSX.Element {
     setWalletProvider(null);
     setMenuOpen(false);
     setMenuTab('networks');
-    
+
     // Clear any stored wallet connection data
     try {
       localStorage.removeItem('walletconnect');
@@ -334,7 +317,7 @@ export function ConnectWalletButton(): JSX.Element {
       localStorage.removeItem('wagmi.store');
       localStorage.removeItem('wagmi.wallet');
       localStorage.removeItem('wagmi.connected');
-      
+
       // Clear session storage as well
       sessionStorage.clear();
     } catch (error) {
@@ -347,12 +330,12 @@ export function ConnectWalletButton(): JSX.Element {
    */
   const handleDisconnect = () => {
     console.log('Disconnecting wallet...');
-    
+
     return new Promise<void>((resolve) => {
       if (walletProvider === 'walletconnect') {
         // Mark as manually disconnected to prevent auto-reconnect
         localStorage.setItem('walletManuallyDisconnected', 'true');
-        
+
         // Disconnect from WalletConnect
         disconnectWalletConnect()
           .then(() => {
@@ -381,50 +364,15 @@ export function ConnectWalletButton(): JSX.Element {
     return (
       <div className="relative mr-4" ref={menuRef}>
         <button
-          disabled={connecting}
           onClick={() => {
             console.log("Connect Wallet button clicked");
-            
-            // Reset UI state
-            setConnecting(true);
-            
-            // Use a more robust approach to ensure disconnection first
-            if (localStorage.getItem('walletConnectionActive') === 'true') {
-              handleDisconnect().finally(() => {
-                // Ensure provider state is reset
-                resetProvider();
-                
-                // Small delay to ensure disconnection is complete
-                setTimeout(() => {
-                  // Try connecting
-                  connectWallet('walletconnect').catch(error => {
-                    console.error("Connect wallet error:", error);
-                    // Show a friendly message to the user if the connection times out or fails
-                    alert("WalletConnect connection failed. Please try again or use a different wallet.");
-                  }).finally(() => {
-                    setTimeout(() => setConnecting(false), 500);
-                  });
-                }, 500);
-              });
-            } else {
-              // Ensure provider state is reset
-              resetProvider();
-              
-              // Connect directly if not previously connected
-              connectWallet('walletconnect').catch(error => {
-                console.error("Connect wallet error:", error);
-                // Show a friendly message to the user if the connection times out or fails
-                alert("WalletConnect connection failed. Please try again or use a different wallet.");
-              }).finally(() => {
-                setTimeout(() => setConnecting(false), 500);
-              });
-            }
+            connectWallet('walletconnect').catch(error => {
+              console.error("Connect wallet error:", error);
+            });
           }}
-          className="flex items-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group"
+          className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group cursor-pointer"
         >
-          <span className="group-hover:text-teal-300">
-            {connecting ? "Connecting..." : "Connect Wallet"}
-          </span>
+          Connect Wallet
         </button>
       </div>
     );
@@ -434,9 +382,9 @@ export function ConnectWalletButton(): JSX.Element {
     <div className="relative mr-4" ref={menuRef}>
       <button
         onClick={() => setMenuOpen(!menuOpen)}
-        className="flex items-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group"
+        className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group cursor-pointer"
       >
-        <span className="group-hover:text-teal-300">{shortenAddress(account)}</span>
+        {shortenAddress(account)}
         <span className="text-xs text-teal-300">{getChainName()}</span>
         <svg
           width="12"
@@ -455,13 +403,13 @@ export function ConnectWalletButton(): JSX.Element {
           <div className="py-1">
             <div className="flex border-b border-gray-700">
               <button
-                className={`flex-1 px-4 py-2 text-sm font-medium group ${menuTab === 'networks' ? 'text-teal-400' : 'text-gray-300 hover:bg-gray-800'}`}
+                className={`flex-1 px-4 py-2 text-sm font-medium group cursor-pointer ${menuTab === 'networks' ? 'text-teal-400' : 'text-gray-300 hover:bg-gray-800'}`}
                 onClick={() => setMenuTab('networks')}
               >
                 <span className="group-hover:text-teal-300">Networks</span>
               </button>
               <button
-                className={`flex-1 px-4 py-2 text-sm font-medium group ${menuTab === 'accounts' ? 'text-teal-400' : 'text-gray-300 hover:bg-gray-800'}`}
+                className={`flex-1 px-4 py-2 text-sm font-medium group cursor-pointer ${menuTab === 'accounts' ? 'text-teal-400' : 'text-gray-300 hover:bg-gray-800'}`}
                 onClick={() => setMenuTab('accounts')}
               >
                 <span className="group-hover:text-teal-300">Accounts</span>
@@ -474,7 +422,7 @@ export function ConnectWalletButton(): JSX.Element {
                 {chains.map((chain) => (
                   <button
                     key={chain.id}
-                    className={`flex w-full items-center text-left px-4 py-2 text-sm ${currentChain === chain.id ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
+                    className={`flex w-full items-center text-left px-4 py-2 text-sm cursor-pointer ${currentChain === chain.id ? 'bg-gray-800 text-teal-400 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
                     onClick={() => switchChain(chain.id)}
                   >
                     <div className="w-5 h-5 mr-2 flex items-center justify-center">
@@ -493,7 +441,7 @@ export function ConnectWalletButton(): JSX.Element {
                   accounts.map((addr) => (
                     <button
                       key={addr}
-                      className={`block w-full text-left px-4 py-2 text-sm ${account === addr ? 'bg-gray-800 text-gray-300 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
+                      className={`block w-full text-left px-4 py-2 text-sm cursor-pointer ${account === addr ? 'bg-gray-800 text-gray-300 font-medium' : 'text-gray-300 hover:bg-gray-800 group'}`}
                       onClick={() => switchAccount(addr)}
                     >
                       <span className="group-hover:text-teal-300">{shortenAddress(addr)}</span>
@@ -504,7 +452,7 @@ export function ConnectWalletButton(): JSX.Element {
                 )}
                 {walletProvider !== 'walletconnect' && (
                   <button
-                    className="block w-full text-left px-4 py-2 text-sm text-teal-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-teal-300"
+                    className="block w-full text-left px-4 py-2 text-sm text-teal-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-teal-300 cursor-pointer"
                     onClick={(e) => {
                       // Open wallet to add/connect account
                       window.ethereum?.request({
@@ -520,9 +468,9 @@ export function ConnectWalletButton(): JSX.Element {
             )}
 
             <button
-              className="block w-full text-left px-4 py-2 text-sm text-red-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-red-300"
+              className="block w-full text-left px-4 py-2 text-sm text-red-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-red-300 cursor-pointer"
               onClick={(e) => {
-                e.preventDefault(); 
+                e.preventDefault();
                 e.stopPropagation();
                 console.log("Disconnect button clicked");
                 handleDisconnect();
@@ -535,4 +483,4 @@ export function ConnectWalletButton(): JSX.Element {
       )}
     </div>
   );
-} 
+}
