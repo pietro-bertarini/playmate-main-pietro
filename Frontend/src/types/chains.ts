@@ -18,14 +18,6 @@ export const chains: Chain[] = [
     iconUrl: "https://cryptologos.cc/logos/ethereum-eth-logo.svg?v=026"
   },
   {
-    id: "0x89",
-    name: "Polygon",
-    rpcUrl: "https://polygon-rpc.com",
-    currency: "MATIC",
-    blockExplorer: "https://polygonscan.com",
-    iconUrl: "https://cryptologos.cc/logos/polygon-matic-logo.svg?v=026"
-  },
-  {
     id: "0xa",
     name: "Optimism",
     rpcUrl: "https://mainnet.optimism.io",
@@ -33,12 +25,4 @@ export const chains: Chain[] = [
     blockExplorer: "https://optimistic.etherscan.io",
     iconUrl: "https://cryptologos.cc/logos/optimism-ethereum-op-logo.svg?v=026"
   },
-  {
-    id: "0xa4b1",
-    name: "Arbitrum",
-    rpcUrl: "https://arb1.arbitrum.io/rpc",
-    currency: "ETH",
-    blockExplorer: "https://arbiscan.io",
-    iconUrl: "https://cryptologos.cc/logos/arbitrum-arb-logo.svg?v=026"
-  }
-]; 
+];

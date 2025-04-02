@@ -50,8 +50,11 @@ export const initWalletConnectModal = () => {
     console.log("Creating new WalletConnect modal");
     walletConnectModal = new WalletConnectModal({
       projectId: PROJECT_ID,
-      chains: ["eip155:1"], // Support Ethereum mainnet for now
-      themeMode: 'dark',
+      chains: [
+        "eip155:1",    // Ethereum Mainnet
+        "eip155:10",   // Optimism
+      ],
+      themeMode: 'dark'
     });
 
     return walletConnectModal;
@@ -87,10 +90,10 @@ export const initEthereumProvider = async (): Promise<any> => {
         themeVariables: {
           '--wcm-z-index': '9999',
         },
-        enableExplorer: true,
+        enableExplorer: true
       },
-      chains: [1],
-      methods: ["personal_sign", "eth_sign"],
+      chains: [1], // Ethereum, Optimism, and Arbitrum
+      methods: ["personal_sign", "eth_sign", "eth_sendTransaction", "wallet_switchEthereumChain"],
       events: ["chainChanged", "accountsChanged", "disconnect", "connect"],
       metadata: {
         name: 'Playmate App',
@@ -98,6 +101,20 @@ export const initEthereumProvider = async (): Promise<any> => {
         url: window.location.origin,
         icons: ['https://playmate.com/logo.png']
       }
+    });
+
+    // Handle chain changes
+    provider.on("chainChanged", (chainId: string) => {
+      console.log("Chain context switched to:", chainId);
+      const numericChainId = parseInt(chainId);
+      // Emit the chain change event for the app to handle
+      const event = new CustomEvent('walletChainChanged', {
+        detail: {
+          chainId: numericChainId,
+          formattedChainId: `0x${numericChainId.toString(16)}`
+        }
+      });
+      window.dispatchEvent(event);
     });
 
     return provider;
@@ -249,6 +266,37 @@ export const openWalletConnectModal = async (): Promise<void> => {
     console.log("WalletConnect modal opening process started");
   } catch (error) {
     console.error("Error opening WalletConnect modal:", error);
+    throw error;
+  }
+};
+
+// Update chain switching function to handle these networks
+export const switchEthereumChain = async (chainId: string): Promise<void> => {
+  if (!provider) {
+    throw new Error("WalletConnect provider not initialized");
+  }
+
+  try {
+    // Convert chainId to number if it's in hex format
+    const targetChainId = typeof chainId === 'string' && chainId.startsWith('0x')
+      ? parseInt(chainId, 16)
+      : Number(chainId);
+
+    // Check if the chain is supported
+    if (![1, 10, 42161].includes(targetChainId)) {
+      throw new Error("Unsupported chain ID. Only Ethereum Mainnet (1), Optimism (10), and Arbitrum (42161) are supported.");
+    }
+
+    console.log("Switching chain context to:", targetChainId);
+
+    // Switch the chain context in the provider
+    await provider.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: `0x${targetChainId.toString(16)}` }],
+    });
+
+  } catch (error) {
+    console.error("Error switching chain context:", error);
     throw error;
   }
 };
