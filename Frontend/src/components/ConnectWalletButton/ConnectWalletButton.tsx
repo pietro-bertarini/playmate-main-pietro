@@ -206,6 +206,11 @@ export function ConnectWalletButton(): JSX.Element {
 
   const switchChain = async (chainId: string) => {
     try {
+      console.log("Switching to chain:", chainId);
+      
+      // Update UI immediately to improve responsiveness
+      setCurrentChain(chainId);
+      
       if (walletProvider === 'walletconnect') {
         const provider = getWalletConnectProvider();
         if (!provider) {
@@ -217,16 +222,21 @@ export function ConnectWalletButton(): JSX.Element {
           ? parseInt(chainId, 16) 
           : Number(chainId);
 
-        console.log("Switching chain context to:", targetChainId);
+        console.log("Switching WalletConnect chain context to:", targetChainId);
         
-        // Switch the chain context in the provider
-        await provider.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: chainId }],
-        });
-
-        // Update the UI immediately
-        setCurrentChain(chainId);
+        try {
+          // Switch the chain context in the provider
+          await provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: chainId }],
+          });
+          console.log("Chain switched successfully in WalletConnect");
+        } catch (error) {
+          console.error("Error switching chain in WalletConnect:", error);
+          // If there's an error, we still keep the UI updated as the mobile wallet
+          // may have switched chains even if we got an error
+        }
+        
         setMenuOpen(false);
         return;
       }
@@ -239,7 +249,7 @@ export function ConnectWalletButton(): JSX.Element {
           method: 'wallet_switchEthereumChain',
           params: [{ chainId }],
         });
-        setCurrentChain(chainId);
+        console.log("Chain switched successfully in MetaMask/browser wallet");
       } catch (switchError: any) {
         if (switchError.code === 4902) {
           const chain = chains.find(c => c.id === chainId);
@@ -262,15 +272,18 @@ export function ConnectWalletButton(): JSX.Element {
                 },
               ],
             });
-            setCurrentChain(chainId);
+            console.log("Chain added successfully to wallet");
           } catch (addError) {
             console.error("Error adding chain:", addError);
           }
+        } else {
+          console.error("Error switching chain:", switchError);
         }
       }
     } catch (error) {
-      console.error("Error switching chain:", error);
+      console.error("Error in switchChain:", error);
     } finally {
+      // Force a re-render to update the UI with the new chain
       setMenuOpen(false);
     }
   };
@@ -502,6 +515,26 @@ export function ConnectWalletButton(): JSX.Element {
                     }}
                   >
                     Connect New Account
+                  </button>
+                )}
+                {walletProvider === 'walletconnect' && (
+                  <button
+                    className="block w-full text-left px-4 py-2 text-sm text-teal-400 font-medium border-t border-gray-700 hover:bg-gray-800 hover:text-teal-300 cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // First disconnect current wallet
+                      handleDisconnect().then(() => {
+                        // Short delay to ensure disconnection completes
+                        setTimeout(() => {
+                          // Open WalletConnect modal with QR code
+                          openWalletConnectModal();
+                        }, 500);
+                      });
+                      setMenuOpen(false);
+                    }}
+                  >
+                    Change Wallet
                   </button>
                 )}
               </>
