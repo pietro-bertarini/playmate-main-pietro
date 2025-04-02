@@ -1,4 +1,6 @@
 // Wallet provider configurations with support for external image URLs
+import { initiateWalletConnectFlow, openWalletConnectModal } from '../utils/walletConnectSetup';
+
 export interface WalletProvider {
   id: string;
   name: string;
@@ -63,6 +65,36 @@ export const walletProviders: WalletProvider[] = [
       } catch (error) {
         console.error("Error requesting Brave Wallet connection:", error);
         return null;
+      }
+    }
+  },
+  {
+    id: "walletconnect",
+    name: "WalletConnect",
+    iconUrl: "https://raw.githubusercontent.com/WalletConnect/walletconnect-assets/master/Icon/Blue%20(Default)/Icon.svg",
+    installUrl: "https://walletconnect.com/",
+    detectInstalled: () => true, // WalletConnect is a protocol, not a browser extension
+    requestConnection: async () => {
+      try {
+        console.log("WalletConnect provider request initiated");
+        // First, try the direct modal opening approach
+        await openWalletConnectModal();
+        
+        // If that works, the modal should be open and showing wallets
+        // wait a bit to make sure the modal is fully rendered
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Then initiate the full flow with URI
+        return await initiateWalletConnectFlow();
+      } catch (error) {
+        console.error("Error with WalletConnect:", error);
+        // Try the traditional flow as fallback
+        try {
+          return await initiateWalletConnectFlow();
+        } catch (innerError) {
+          console.error("Also failed with traditional flow:", innerError);
+          return null;
+        }
       }
     }
   }
