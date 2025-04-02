@@ -2,31 +2,23 @@ import { chains } from '../types/chains';
 import { WalletConnectModal } from '@walletconnect/modal';
 import { EthereumProvider } from '@walletconnect/ethereum-provider';
 
-const PROJECT_ID = '6125bb2586f4b993ee30dcdab730a7fd';
+// Get the WalletConnect Project ID from environment variables or use fallback for development
+const PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '6125bb2586f4b993ee30dcdab730a7fd';
 
 // Initialize the WalletConnectModal instance
 let walletConnectModal: WalletConnectModal | null = null;
 
 // Initialize the EthereumProvider instance
 let provider: any = null;
-// Track initialization status
-let providerInitializing = false;
-// Store the initialization promise
-let providerInitPromise: Promise<any> | null = null;
 
 // Convert our chain configurations to CAIP-2 format
-const getChainIds = () => {
+const getChainCaip2Ids = () => {
   return chains.map(chain => `eip155:${parseInt(chain.id, 16)}`);
 };
 
 // Get numeric chain IDs
 const getNumericChainIds = () => {
   return chains.map(chain => parseInt(chain.id, 16));
-};
-
-// Check if user is on mobile
-const isMobile = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 };
 
 // Check if MetaMask is installed
@@ -50,10 +42,7 @@ export const initWalletConnectModal = () => {
     console.log("Creating new WalletConnect modal");
     walletConnectModal = new WalletConnectModal({
       projectId: PROJECT_ID,
-      chains: [
-        "eip155:1",    // Ethereum Mainnet
-        "eip155:10",   // Optimism
-      ],
+      chains: getChainCaip2Ids(),
       themeMode: 'dark'
     });
 
@@ -82,17 +71,16 @@ export const initEthereumProvider = async (): Promise<any> => {
 
   try {
     console.log("Initializing WalletConnect provider...");
+    // Get all chains, use Ethereum mainnet (1) as fallback
+    const chainIds = getNumericChainIds();
+    const mainChain = chainIds[0] || 1;
+    
     provider = await EthereumProvider.init({
       projectId: PROJECT_ID,
       showQrModal: true,
-      qrModalOptions: {
-        themeMode: 'dark',
-        themeVariables: {
-          '--wcm-z-index': '9999',
-        },
-        enableExplorer: true
-      },
-      chains: [1], // Ethereum, Optimism, and Arbitrum
+      // Use the first chain as required chain, and all chains as optional
+      chains: [mainChain],
+      optionalChains: chainIds.length > 0 ? chainIds : [1],
       methods: ["personal_sign", "eth_sign", "eth_sendTransaction", "wallet_switchEthereumChain"],
       events: ["chainChanged", "accountsChanged", "disconnect", "connect"],
       metadata: {
@@ -164,8 +152,6 @@ export const connectToMetaMask = async (): Promise<string[]> => {
 export function resetProvider() {
   console.log('Resetting WalletConnect provider state');
   provider = null;
-  providerInitializing = false;
-  providerInitPromise = null;
 
   // Clear the manual disconnect flag
   localStorage.removeItem('walletManuallyDisconnected');
@@ -270,7 +256,7 @@ export const openWalletConnectModal = async (): Promise<void> => {
   }
 };
 
-// Update chain switching function to handle these networks
+// Update chain switching function to handle the configured networks
 export const switchEthereumChain = async (chainId: string): Promise<void> => {
   if (!provider) {
     throw new Error("WalletConnect provider not initialized");
@@ -282,9 +268,10 @@ export const switchEthereumChain = async (chainId: string): Promise<void> => {
       ? parseInt(chainId, 16)
       : Number(chainId);
 
-    // Check if the chain is supported
-    if (![1, 10, 42161].includes(targetChainId)) {
-      throw new Error("Unsupported chain ID. Only Ethereum Mainnet (1), Optimism (10), and Arbitrum (42161) are supported.");
+    // Check if the chain is supported by looking it up in our chains array
+    const supportedChainIds = getNumericChainIds();
+    if (!supportedChainIds.includes(targetChainId)) {
+      throw new Error(`Unsupported chain ID. Only supported chains are: ${chains.map(c => c.name).join(', ')}`);
     }
 
     console.log("Switching chain context to:", targetChainId);
