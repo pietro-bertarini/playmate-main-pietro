@@ -149,15 +149,6 @@ export function ConnectWalletButton(): JSX.Element {
           }
         } catch (wcError: any) {
           console.error("WalletConnect connection error:", wcError);
-          
-          // If code is 4001, it's a user rejection
-          if (wcError.code === 4001) {
-            console.log("User rejected the WalletConnect connection");
-            setWalletProvider(null);
-            throw wcError; // Re-throw to be caught by the outer handler
-          }
-          
-          // If we get here, there was some other error with WalletConnect
           setWalletProvider(null);
           throw wcError;
         }

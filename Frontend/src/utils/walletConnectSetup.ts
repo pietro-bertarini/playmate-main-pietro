@@ -71,81 +71,40 @@ export const initWalletConnectModal = () => {
 
 // Initialize the EthereumProvider
 export const initEthereumProvider = async (): Promise<any> => {
-  // Reset on each connection attempt to avoid initialization issues
-  if (manuallyDisconnected) {
-    console.log("Manual disconnect flag found, resetting provider for clean start");
-    resetProvider();
-    localStorage.removeItem('walletManuallyDisconnected');
-  }
-
   // Return the existing provider if already initialized
   if (provider) {
     console.log("Using existing provider");
     return provider;
   }
 
-  // If initialization is in progress, return the existing promise
-  if (providerInitializing && providerInitPromise) {
-    console.log("Provider initialization already in progress, returning existing promise");
-    return providerInitPromise;
-  }
-
-  // Set initialization flag
-  providerInitializing = true;
-
-  // Create the initialization promise
-  providerInitPromise = new Promise(async (resolve, reject) => {
-    try {
-      console.log("Initializing WalletConnect provider...");
-
-      const newProvider = await EthereumProvider.init({
-        projectId: PROJECT_ID,
-        showQrModal: true, // Show QR code modal with wallet selection
-        qrModalOptions: {
-          themeMode: 'dark',
-          themeVariables: {
-            '--wcm-z-index': '9999', // Ensure modal appears above everything
-          },
-          explorerRecommendedWalletIds: ['metamask'], // Ensure MetaMask is recommended
-          enableExplorer: true, // Enable wallet explorer
-        },
-        chains: [1], // Default to Ethereum mainnet
-        optionalChains: getNumericChainIds(), // Add other chains as optional
-        methods: ["eth_sendTransaction", "personal_sign", "eth_sign", "eth_signTypedData"],
-        events: ["chainChanged", "accountsChanged", "disconnect", "connect"],
-        metadata: {
-          name: 'Playmate App',
-          description: 'Connect your wallet to Playmate',
-          url: window.location.origin,
-          icons: ['https://playmate.com/logo.png'] // Replace with your app logo
-        }
-      });
-
-      // Store the provider globally
-      provider = newProvider;
-      resolve(provider);
-    } catch (error) {
-      console.error("Failed to initialize EthereumProvider:", error);
-      // Reset initialization flags on error
-      providerInitializing = false;
-      providerInitPromise = null;
-      // Clean up any partial provider
-      provider = null;
-      reject(error);
-    }
-  });
-
   try {
-    // Wait for initialization to complete
-    const result = await providerInitPromise;
-    return result;
+    console.log("Initializing WalletConnect provider...");
+    provider = await EthereumProvider.init({
+      projectId: PROJECT_ID,
+      showQrModal: true,
+      qrModalOptions: {
+        themeMode: 'dark',
+        themeVariables: {
+          '--wcm-z-index': '9999',
+        },
+        enableExplorer: true,
+      },
+      chains: [1],
+      methods: ["personal_sign", "eth_sign"],
+      events: ["chainChanged", "accountsChanged", "disconnect", "connect"],
+      metadata: {
+        name: 'Playmate App',
+        description: 'Connect your wallet to Playmate',
+        url: window.location.origin,
+        icons: ['https://playmate.com/logo.png']
+      }
+    });
+
+    return provider;
   } catch (error) {
-    // Reset everything on error to allow for retry
-    resetProvider();
+    console.error("Failed to initialize EthereumProvider:", error);
+    provider = null;
     throw error;
-  } finally {
-    // Reset initialization flag when done (whether success or failure)
-    providerInitializing = false;
   }
 };
 
@@ -207,181 +166,35 @@ export function resetProvider() {
 
 /**
  * Initiates the WalletConnect connection flow
- * Uses the built-in QR code modal with desktop options
  */
 export const initiateWalletConnectFlow = async (): Promise<string[]> => {
   console.log("Starting WalletConnect flow...");
   try {
-    // Reset any existing provider first
-    resetProvider();
-
-    // Initialize a fresh WalletConnect provider
-    console.log("Initializing provider...");
+    // Initialize provider if needed
     const wcProvider = await initEthereumProvider();
     console.log("Provider initialized:", wcProvider);
 
-    // Setup listeners for connection events
-    const connectionPromise = new Promise<string[]>((resolve, reject) => {
-      console.log("Setting up connection event listeners...");
+    // Connect and wait for accounts
+    await wcProvider.connect();
+    console.log("Connected to WalletConnect");
 
-      // Listen for the 'connect' event
-      const onConnect = (connectedAccounts: string[]) => {
-        console.log("Connect event received with accounts:", connectedAccounts);
-        if (connectedAccounts && connectedAccounts.length > 0) {
-          wcProvider.removeListener('connect', onConnect);
-          wcProvider.removeListener('error', onError);
-          wcProvider.removeListener('disconnect', onDisconnect);
-          resolve(connectedAccounts);
-        } else if (wcProvider.accounts && wcProvider.accounts.length > 0) {
-          // Handle case where connect event might not have the accounts
-          console.log("Using accounts from provider:", wcProvider.accounts);
-          wcProvider.removeListener('connect', onConnect);
-          wcProvider.removeListener('error', onError);
-          wcProvider.removeListener('disconnect', onDisconnect);
-          resolve(wcProvider.accounts);
-        }
-      };
+    // Get accounts from the session
+    if (wcProvider.accounts && wcProvider.accounts.length > 0) {
+      console.log("Got accounts from session:", wcProvider.accounts);
+      return wcProvider.accounts;
+    }
 
-      // Listen for connection errors
-      const onError = (error: any) => {
-        console.log("Error event received:", error);
-        // Create a standardized error object similar to MetaMask
-        const formattedError = {
-          code: 4001,
-          message: 'User rejected the request.',
-          stack: error.toString()
-        };
-        wcProvider.removeListener('connect', onConnect);
-        wcProvider.removeListener('error', onError);
-        wcProvider.removeListener('disconnect', onDisconnect);
-        reject(formattedError);
-      };
-
-      // Listen for disconnection
-      const onDisconnect = () => {
-        console.log("Disconnect event received");
-        // Create a standardized error object similar to MetaMask
-        const formattedError = {
-          code: 4001,
-          message: 'User rejected the request.',
-          stack: 'WalletConnect disconnected'
-        };
-        wcProvider.removeListener('connect', onConnect);
-        wcProvider.removeListener('error', onError);
-        wcProvider.removeListener('disconnect', onDisconnect);
-        reject(formattedError);
-      };
-
-      // Add event listeners
-      wcProvider.on('connect', onConnect);
-      wcProvider.on('error', onError);
-      wcProvider.on('disconnect', onDisconnect);
-
-      // Add explicit accountsChanged handler
-      const onAccountsChanged = (newAccounts: string[]) => {
-        console.log("Accounts changed event received:", newAccounts);
-        if (newAccounts && newAccounts.length > 0) {
-          wcProvider.removeListener('connect', onConnect);
-          wcProvider.removeListener('error', onError);
-          wcProvider.removeListener('disconnect', onDisconnect);
-          wcProvider.removeListener('accountsChanged', onAccountsChanged);
-          resolve(newAccounts);
-        }
-      };
-      wcProvider.on('accountsChanged', onAccountsChanged);
-
-      // Also check if we're already connected
-      setTimeout(() => {
-        if (wcProvider.accounts && wcProvider.accounts.length > 0) {
-          console.log("Provider already has accounts:", wcProvider.accounts);
-          wcProvider.removeListener('connect', onConnect);
-          wcProvider.removeListener('error', onError);
-          wcProvider.removeListener('disconnect', onDisconnect);
-          wcProvider.removeListener('accountsChanged', onAccountsChanged);
-          resolve(wcProvider.accounts);
-        }
-      }, 1000);
-      
-      // Add a timeout to prevent hanging indefinitely
-      const connectionTimeout = setTimeout(() => {
-        console.log("Connection timeout after 30 seconds");
-        wcProvider.removeListener('connect', onConnect);
-        wcProvider.removeListener('error', onError);
-        wcProvider.removeListener('disconnect', onDisconnect);
-        wcProvider.removeListener('accountsChanged', onAccountsChanged);
-        
-        // Check once more if we have accounts before rejecting
-        if (wcProvider.accounts && wcProvider.accounts.length > 0) {
-          console.log("Found accounts before timeout:", wcProvider.accounts);
-          resolve(wcProvider.accounts);
-        } else {
-          const timeoutError = {
-            code: 4001,
-            message: 'Connection timed out. User may have rejected the request or connection process took too long.',
-            stack: 'WalletConnect connection timeout'
-          };
-          reject(timeoutError);
-        }
-      }, 30000); // 30 second timeout
-      
-      // Clean up timeout when promise resolves or rejects
-      const cleanupTimeout = () => {
-        clearTimeout(connectionTimeout);
-      };
-      
-      // Add cleanup to our promise handlers
-      connectionPromise.then(cleanupTimeout).catch(cleanupTimeout);
-    });
-
+    // If no accounts in session, request them
     try {
-      // Connect will show the QR code modal with desktop options
-      console.log("Connecting provider (will show QR code modal)...");
-      console.log("Provider state before connect:", {
-        connected: wcProvider.connected,
-        chainId: wcProvider.chainId,
-        hasAccounts: wcProvider.accounts && wcProvider.accounts.length > 0,
-      });
-      
-      await wcProvider.connect();
-      
-      console.log("Connection process started, waiting for result...");
-      console.log("Provider state after connect call:", {
-        connected: wcProvider.connected,
-        chainId: wcProvider.chainId,
-        hasAccounts: wcProvider.accounts && wcProvider.accounts.length > 0,
-      });
-
-      // Try to directly request accounts if available
-      try {
-        if (wcProvider.request) {
-          console.log("Trying explicit eth_requestAccounts call");
-          const accounts = await wcProvider.request({ method: 'eth_requestAccounts' });
-          console.log("eth_requestAccounts result:", accounts);
-          if (accounts && accounts.length > 0) {
-            return accounts;
-          }
-        }
-      } catch (requestError) {
-        console.log("eth_requestAccounts failed, continuing with event listeners:", requestError);
-      }
-
-      // Wait for connection result
-      return await connectionPromise;
-    } catch (error: any) {
-      // Clean up provider
-      console.error("Error in WalletConnect flow:", error);
-
-      // Standardize the error to match MetaMask's format
-      const formattedError = {
-        code: error.code || 4001,
-        message: error.message || 'User rejected the request.',
-        stack: error.stack || JSON.stringify(error)
-      };
-      throw formattedError;
+      const accounts = await wcProvider.request({ method: 'eth_requestAccounts' });
+      console.log("Requested accounts:", accounts);
+      return accounts;
+    } catch (error) {
+      console.error("Error requesting accounts:", error);
+      throw error;
     }
   } catch (error) {
-    console.error('Error initiating WalletConnect:', error);
-    // Always propagate the error so it can be handled by the ConnectWalletButton
+    console.error("Error in WalletConnect flow:", error);
     throw error;
   }
 };
