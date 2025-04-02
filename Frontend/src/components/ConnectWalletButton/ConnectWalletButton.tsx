@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { chains } from "../../types/chains";
 import { walletProviders } from "../../types/wallet-providers";
-import { disconnectWalletConnect, getWalletConnectProvider, resetProvider, openWalletConnectModal, initiateWalletConnectFlow } from '../../utils/walletConnectSetup';
+import { disconnectWalletConnect, getWalletConnectProvider, resetProvider, openWalletConnectModal, initiateWalletConnectFlow, subscribeToModalEvents } from '../../utils/walletConnectSetup';
 
 /**
  * A standalone wallet connection component that handles connecting to
@@ -14,6 +14,8 @@ export function ConnectWalletButton(): JSX.Element {
   const [walletProvider, setWalletProvider] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuTab, setMenuTab] = useState<'networks' | 'accounts'>('networks');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Define disconnectWallet using useCallback to avoid dependency issues
@@ -98,7 +100,32 @@ export function ConnectWalletButton(): JSX.Element {
     };
   }, []);
 
+  // Add an effect to listen for WalletConnect modal state changes
+  useEffect(() => {
+    // Subscribe to modal events to handle loading state
+    const unsubscribe = subscribeToModalEvents((state: { open: boolean }) => {
+      console.log("WalletConnect modal state changed:", state);
+      // If modal is closed, we should end the loading state
+      // But we only do this after a small delay to account for possible redirect to MetaMask
+      if (!state.open) {
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+      }
+    });
+    
+    // Clean up subscription when component unmounts
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
   const connectWallet = async (providerId = 'metamask') => {
+    // Set loading state to true when starting connection
+    setIsLoading(true);
+    
     // Clear the manual disconnect flag when user tries to connect again
     localStorage.removeItem('walletManuallyDisconnected');
 
@@ -113,6 +140,7 @@ export function ConnectWalletButton(): JSX.Element {
     const provider = walletProviders.find(p => p.id === providerId);
     if (!provider) {
       console.error(`Provider ${providerId} not found`);
+      setIsLoading(false); // Reset loading state on error
       return;
     }
 
@@ -138,6 +166,7 @@ export function ConnectWalletButton(): JSX.Element {
 
             setWalletProvider('walletconnect');
             localStorage.setItem('walletConnectionActive', 'true');
+            setIsLoading(false); // Reset loading state on success
             return; // Exit early on success
           } else {
             console.log("No accounts returned from WalletConnect");
@@ -146,6 +175,7 @@ export function ConnectWalletButton(): JSX.Element {
         } catch (wcError: any) {
           console.error("WalletConnect connection error:", wcError);
           setWalletProvider(null);
+          setIsLoading(false); // Reset loading state on error
           throw wcError;
         }
       }
@@ -154,6 +184,7 @@ export function ConnectWalletButton(): JSX.Element {
       if (providerId !== 'walletconnect' && !provider.detectInstalled()) {
         // Open the install URL in a new tab
         window.open(provider.installUrl, '_blank');
+        setIsLoading(false); // Reset loading state
         return;
       }
 
@@ -201,6 +232,7 @@ export function ConnectWalletButton(): JSX.Element {
       setWalletProvider(null);
     } finally {
       setMenuOpen(false);
+      setIsLoading(false); // Always reset loading state when done
     }
   };
 
@@ -398,6 +430,7 @@ export function ConnectWalletButton(): JSX.Element {
    */
   const handleDisconnect = () => {
     console.log('Disconnecting wallet...');
+    setIsDisconnecting(true);
 
     return new Promise<void>((resolve) => {
       if (walletProvider === 'walletconnect') {
@@ -417,12 +450,14 @@ export function ConnectWalletButton(): JSX.Element {
             resetState();
             localStorage.removeItem('walletConnectionActive');
             resetProvider();
+            setIsDisconnecting(false);
             resolve();
           });
       } else {
         // For other wallet providers
         resetState();
         localStorage.removeItem('walletConnectionActive');
+        setIsDisconnecting(false);
         resolve();
       }
     });
@@ -436,11 +471,25 @@ export function ConnectWalletButton(): JSX.Element {
             console.log("Connect Wallet button clicked");
             connectWallet('walletconnect').catch(error => {
               console.error("Connect wallet error:", error);
+              setIsLoading(false); // Ensure loading state is reset on error
             });
           }}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-teal-400 hover:bg-gray-800 group cursor-pointer"
+          disabled={isLoading}
+          className={`w-full inline-flex items-center justify-center gap-2 rounded-md bg-gray-900 px-3 py-2 text-sm font-medium ${
+            isLoading ? 'text-gray-400' : 'text-teal-400 hover:bg-gray-800'
+          } group cursor-pointer`}
         >
-          Connect Wallet
+          {isLoading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Connecting...
+            </>
+          ) : (
+            'Connect Wallet'
+          )}
         </button>
       </div>
     );
@@ -547,18 +596,37 @@ export function ConnectWalletButton(): JSX.Element {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      // Set loading state to true before starting the disconnect process
+                      setIsLoading(true);
                       // First disconnect current wallet
                       handleDisconnect().then(() => {
                         // Short delay to ensure disconnection completes
                         setTimeout(() => {
                           // Open WalletConnect modal with QR code
-                          openWalletConnectModal();
+                          openWalletConnectModal().catch(error => {
+                            console.error("Error opening WalletConnect modal:", error);
+                            setIsLoading(false); // Reset loading state if modal fails to open
+                          });
                         }, 500);
+                      }).catch(error => {
+                        console.error("Error disconnecting wallet:", error);
+                        setIsLoading(false); // Reset loading state if disconnect fails
                       });
                       setMenuOpen(false);
                     }}
+                    disabled={isLoading}
                   >
-                    Change Wallet
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Connecting...
+                      </div>
+                    ) : (
+                      "Change Wallet"
+                    )}
                   </button>
                 )}
               </>
@@ -572,8 +640,19 @@ export function ConnectWalletButton(): JSX.Element {
                 console.log("Disconnect button clicked");
                 handleDisconnect();
               }}
+              disabled={isDisconnecting}
             >
-              Disconnect
+              {isDisconnecting ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Disconnecting...
+                </div>
+              ) : (
+                "Disconnect"
+              )}
             </button>
           </div>
         </div>
