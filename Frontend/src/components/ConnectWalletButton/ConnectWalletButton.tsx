@@ -291,9 +291,33 @@ export function ConnectWalletButton(): JSX.Element {
   const switchAccount = (newAccount: string) => {
     if (newAccount === account) return;
 
-    // For WalletConnect, we don't support account switching in this UI
+    // For WalletConnect, we need to update the active account
     if (walletProvider === 'walletconnect') {
-      alert("Please switch accounts in your WalletConnect compatible wallet app");
+      // Simply update the active account in the UI
+      setAccount(newAccount);
+
+      // Get WalletConnect provider
+      const wcProvider = getWalletConnectProvider();
+      if (wcProvider) {
+        try {
+          // Try to inform the provider about the account change if possible
+          // Not all WalletConnect providers support this directly, so we update our UI regardless
+          console.log("Changing active WalletConnect account to:", newAccount);
+          
+          // Some WalletConnect implementations support this method
+          if (typeof wcProvider.request === 'function') {
+            wcProvider.request({
+              method: 'wallet_switchEthereumAccount',
+              params: [newAccount]
+            }).catch((err: Error) => {
+              console.log("Provider doesn't support account switching directly:", err);
+            });
+          }
+        } catch (error) {
+          console.error("Error setting active account in WalletConnect:", error);
+        }
+      }
+      
       setMenuOpen(false);
       return;
     }
