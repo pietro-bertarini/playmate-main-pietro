@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 import { Layout } from "./layout/Layout";
@@ -12,6 +12,7 @@ import { NetworkIndex } from "pages/MyNetwork/NetworkIndex";
 import { MyPlaymate } from "pages/MyPlaymate/MyPlaymate";
 import { Settings } from "pages/Settings/Settings";
 import { LoginRegister } from "pages/LoginRegister/LoginRegister";
+import { initWalletConnectModal, initEthereumProvider } from "./utils/walletConnectSetup";
 
 import "@fontsource/public-sans/300.css";
 import "@fontsource/public-sans/400.css";
@@ -75,6 +76,23 @@ export function App() {
     let root = document.documentElement;
     const vh = Math.max(root.clientHeight || 0, window.innerHeight || 0);
     root.style.setProperty("--app-root-winh", `${vh}px`);
+  }, []);
+
+  // Initialize WalletConnect providers
+  useEffect(() => {
+    // Initialize WalletConnect modal on app mount
+    initWalletConnectModal();
+    
+    // Initialize WalletConnect Ethereum provider
+    const initProviders = async () => {
+      try {
+        await initEthereumProvider();
+      } catch (error) {
+        console.error("Error initializing WalletConnect provider:", error);
+      }
+    };
+    
+    initProviders();
   }, []);
 
   return (
