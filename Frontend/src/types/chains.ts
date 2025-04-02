@@ -16,6 +16,7 @@ export const chains: Chain[] = [
     currency: "ETH",
     blockExplorer: "https://etherscan.io",
     iconUrl: "https://cryptologos.cc/logos/ethereum-eth-logo.svg?v=026"
+
   },
   {
     id: "0xa",
